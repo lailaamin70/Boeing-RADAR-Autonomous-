@@ -2,7 +2,12 @@
 __pycache__/
 *.pyc
 .venv/
+.env/
 venv/
+env/
 
 # VS Code
 .vscode/
+
+# Datasets
+data/
