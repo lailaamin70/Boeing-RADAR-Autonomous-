@@ -6,3 +6,13 @@ venv/
 
 # VS Code
 .vscode/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# TruckScenes dataset
+data/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
