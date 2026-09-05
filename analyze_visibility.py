@@ -5,67 +5,101 @@ import pandas as pd
 from truckscenes import TruckScenes
 from truckscenes.utils.data_classes import LidarPointCloud, RadarPointCloud
 
-# 1. Dataset root directory
-DATAROOT = r"C:/Users/mindfulness/Desktop/CITS3200/man-truckscenes_sensordata_v1.2-mini/man-truckscenes"
-nusc = TruckScenes(version='v1.2-mini', dataroot=DATAROOT, verbose=False)
 
-records = []
-print("Processing scenes and computing sensor metrics across visibility conditions...")
+def analyze_visibility(dataroot, version='v1.2-mini', verbose=False, output_csv=None):
+    """
+    Iterate through every scene/sample in the dataset and compute
+    camera brightness, LiDAR point count, and radar point count,
+    grouped by a coarse weather condition parsed from the scene
+    description.
 
-# 2. Iterate through each scene and categorize visibility condition
-for scene in nusc.scene:
-    desc = scene['description'].lower()
-    
-    if "rain" in desc:
-        condition = "Rainy"
-    elif "snow" in desc:
-        condition = "Snowy"
-    else:
-        condition = "Clear"
+    Parameters
+    ----------
+    dataroot : str
+        Path to the TruckScenes dataset root.
+    version : str
+        Dataset version to load.
+    verbose : bool
+        Passed through to TruckScenes loader.
+    output_csv : str or None
+        If given, also save the resulting DataFrame to this CSV path.
 
-    current_sample_token = scene['first_sample_token']
-    
-    while current_sample_token:
-        sample = nusc.get('sample', current_sample_token)
-        
-        # 2.1 Camera: Mean pixel intensity (0 to 255)
-        cam_token = sample['data'].get('CAMERA_LEFT_FRONT')
-        cam_path = os.path.join(DATAROOT, nusc.get('sample_data', cam_token)['filename'])
-        img = cv2.imread(cam_path)
-        brightness = np.mean(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)) if img is not None else 0.0
+    Returns
+    -------
+    pandas.DataFrame with columns:
+        Scene, Condition, Camera_Brightness, LiDAR_Points, Radar_Points
+    """
+    nusc = TruckScenes(version=version, dataroot=dataroot, verbose=verbose)
 
-        # 2.2 LiDAR: Total valid return points count
-        lidar_token = sample['data'].get('LIDAR_TOP_FRONT', sample['data'].get('LIDAR_LEFT'))
-        lidar_path = os.path.join(DATAROOT, nusc.get('sample_data', lidar_token)['filename'])
-        lidar_pc = LidarPointCloud.from_file(lidar_path)
-        lidar_points_count = lidar_pc.points.shape[1]
+    records = []
+    print("Processing scenes and computing sensor metrics across visibility conditions...")
 
-        # 2.3 Radar: Total detection returns count
-        radar_token = sample['data'].get('RADAR_LEFT_FRONT')
-        radar_path = os.path.join(DATAROOT, nusc.get('sample_data', radar_token)['filename'])
-        radar_pc = RadarPointCloud.from_file(radar_path)
-        radar_points_count = radar_pc.points.shape[1]
+    # Iterate through each scene and categorize visibility condition
+    for scene in nusc.scene:
+        desc = scene['description'].lower()
 
-        records.append({
-            "Scene": scene['name'],
-            "Condition": condition,
-            "Camera_Brightness": brightness,
-            "LiDAR_Points": lidar_points_count,
-            "Radar_Points": radar_points_count
-        })
+        if "rain" in desc:
+            condition = "Rainy"
+        elif "snow" in desc:
+            condition = "Snowy"
+        else:
+            condition = "Clear"
 
-        current_sample_token = sample['next']
+        current_sample_token = scene['first_sample_token']
 
-# 3. Aggregate results using pandas
-df = pd.DataFrame(records)
+        while current_sample_token:
+            sample = nusc.get('sample', current_sample_token)
 
-print("\n=======================================================")
-print("  SENSOR METRICS COMPARISON ACROSS VISIBILITY CONDITIONS")
-print("=======================================================")
-summary = df.groupby("Condition")[["Camera_Brightness", "LiDAR_Points", "Radar_Points"]].agg(["mean", "std"]).round(2)
-print(summary)
+            # Camera: Mean pixel intensity (0 to 255)
+            cam_token = sample['data'].get('CAMERA_LEFT_FRONT')
+            cam_path = os.path.join(dataroot, nusc.get('sample_data', cam_token)['filename'])
+            img = cv2.imread(cam_path)
+            brightness = np.mean(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)) if img is not None else 0.0
 
-# 4. Export results to CSV for technical reporting and dashboard integration
-output_csv = "visibility_sensor_metrics.csv"
-df.to_csv(output_csv, index=False)
-print(f"\nExtracted dataset successfully saved to: {output_csv}")
+            # LiDAR: Total valid return points count
+            lidar_token = sample['data'].get('LIDAR_TOP_FRONT', sample['data'].get('LIDAR_LEFT'))
+            lidar_path = os.path.join(dataroot, nusc.get('sample_data', lidar_token)['filename'])
+            lidar_pc = LidarPointCloud.from_file(lidar_path)
+            lidar_points_count = lidar_pc.points.shape[1]
+
+            # Radar: Total detection returns count
+            radar_token = sample['data'].get('RADAR_LEFT_FRONT')
+            radar_path = os.path.join(dataroot, nusc.get('sample_data', radar_token)['filename'])
+            radar_pc = RadarPointCloud.from_file(radar_path)
+            radar_points_count = radar_pc.points.shape[1]
+
+            records.append({
+                "Scene": scene['name'],
+                "Condition": condition,
+                "Camera_Brightness": brightness,
+                "LiDAR_Points": lidar_points_count,
+                "Radar_Points": radar_points_count
+            })
+
+            current_sample_token = sample['next']
+
+    df = pd.DataFrame(records)
+
+    print("\n=======================================================")
+    print("  SENSOR METRICS COMPARISON ACROSS VISIBILITY CONDITIONS")
+    print("=======================================================")
+    summary = df.groupby("Condition")[["Camera_Brightness", "LiDAR_Points", "Radar_Points"]].agg(["mean", "std"]).round(2)
+    print(summary)
+
+    if output_csv:
+        df.to_csv(output_csv, index=False)
+        print(f"\nExtracted dataset successfully saved to: {output_csv}")
+
+    return df
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Analyze TruckScenes sensor visibility metrics.")
+    parser.add_argument("dataroot", help="Path to the TruckScenes dataset root")
+    parser.add_argument("--version", default="v1.2-mini", help="Dataset version")
+    parser.add_argument("--output-csv", default="visibility_sensor_metrics.csv", help="Where to save results")
+    args = parser.parse_args()
+
+    analyze_visibility(args.dataroot, version=args.version, output_csv=args.output_csv)
