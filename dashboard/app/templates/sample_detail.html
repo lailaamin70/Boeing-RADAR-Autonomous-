@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Sample — TruckScenes Explorer{% endblock %}
+
+{% block content %}
+  <div class="mb-3">
+    <a href="{{ url_for('dashboard.scene_detail', scene_token=scene.token) }}" class="text-dim text-decoration-none">
+      &larr; {{ scene.name }}
+    </a>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h4 mb-1">Sample</h1>
+      <div class="text-dim mono">{{ sample.token }} &middot; t={{ sample.timestamp }}</div>
+    </div>
+    <div>
+      {% if sample.prev %}
+        <a href="{{ url_for('dashboard.sample_detail', sample_token=sample.prev) }}" class="btn btn-sm btn-outline-secondary">Prev</a>
+      {% endif %}
+      {% if sample.next %}
+        <a href="{{ url_for('dashboard.sample_detail', sample_token=sample.next) }}" class="btn btn-sm btn-accent">Next</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3">
+    {% for channel, entry in channels.items() %}
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="channel-card">
+          <div class="channel-head">
+            <span>{{ channel }}</span>
+            <span class="tag badge-{{ entry.modality }}">{{ entry.modality }}</span>
+          </div>
+          {% if entry.modality == 'camera' %}
+            <img src="{{ url_for('dashboard.media', filename=entry.sample_data.filename) }}" alt="{{ channel }}">
+          {% elif entry.modality in ('radar', 'lidar') %}
+            <img src="{{ url_for('dashboard.sensor_plot', sample_token=sample.token, channel=channel) }}" alt="{{ channel }} BEV">
+          {% else %}
+            <div class="p-3 text-dim">No preview available for modality "{{ entry.modality }}".</div>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endblock %}
