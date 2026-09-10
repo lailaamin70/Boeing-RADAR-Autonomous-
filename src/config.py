@@ -1,21 +1,9 @@
 """
-Global configuration for the TruckScenes analysis project.
+Global configuration for the TruckScenes velocity and efficiency analysis.
 
-This file stores dataset paths and shared project settings.
-
-The purpose of this file is to avoid hard-coding dataset locations
-and dataset versions inside individual notebooks or analysis modules.
-
-During development, the project uses TruckScenes v1.2-mini.
-
-To analyse the complete TruckScenes dataset later:
-
-1. Update DATA_ROOT if the full dataset is stored in another location.
-2. Change METADATA_DIR_NAME to the metadata directory used by the
-   complete dataset.
-3. Keep the analysis notebooks and reusable Python functions unchanged.
-
-Additional project-wide settings can also be added to this file later.
+This file stores dataset paths and shared project settings so that
+dataset locations, versions, and common units are not hard-coded
+inside individual notebooks or analysis modules.
 """
 
 from pathlib import Path
@@ -28,9 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # Dataset configuration
 DATA_ROOT = PROJECT_ROOT / "data" / "man-truckscenes"
 
-# Current metadata version.
-# Change this when switching from the mini dataset to the full dataset.
-METADATA_DIR_NAME = "v1.2-mini"
+VERSION = "v1.2-mini"
 
 
 # Derived dataset paths
@@ -40,4 +26,9 @@ SAMPLES_ROOT = SENSOR_ROOT / "samples"
 
 SWEEPS_ROOT = SENSOR_ROOT / "sweeps"
 
-METADATA_ROOT = DATA_ROOT / METADATA_DIR_NAME
+METADATA_ROOT = DATA_ROOT / VERSION
+
+
+# Shared timestamp conversion
+# TruckScenes timestamps are stored in microseconds.
+TIMESTAMP_UNITS_PER_SECOND = 1_000_000
