@@ -1,9 +1,9 @@
 import os
 
-from flask import Blueprint, abort, current_app, render_template, request, send_file
+from flask import Blueprint, abort, current_app, jsonify, render_template, request, send_file
 from werkzeug.security import safe_join
 
-from app import truckscenes_loader as tsl
+from app import analytics, truckscenes_loader as tsl
 
 bp = Blueprint("dashboard", __name__)
 
@@ -102,6 +102,35 @@ def media(filename):
         abort(404)
     return send_file(safe_path)
 
+@bp.route("/analysis")
+def analysis():
+    """Cross-scene comparison page"""
+    scenes = tsl.list_scenes()
+    all_tags = sorted({tag for s in scenes for tag in s["tags"]})
+    return render_template(
+        "analysis.html",
+        all_tags=all_tags,
+        metrics=analytics.metric_catalog(),
+    )
+
+
+@bp.route("/api/analysis")
+def api_analysis():
+    """JSON data behind the analysis page charts"""
+    tags = request.args.getlist("tag")
+    metrics = request.args.getlist("metric") or ["sweep_point_count"]
+    group_by = request.args.get("group_by", "tag")
+    if group_by not in ("tag", "scene"):
+        group_by = "tag"
+    include_expensive = request.args.get("expensive") == "1"
+
+    data = analytics.aggregate_by_condition(
+        selected_tags=tags,
+        selected_metrics=metrics,
+        group_by=group_by,
+        include_expensive=include_expensive,
+    )
+    return jsonify(data)
 
 @bp.errorhandler(404)
 def not_found(e):
