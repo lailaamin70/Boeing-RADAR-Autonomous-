@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 
 from truckscenes import TruckScenes
-from truckscenes.utils.data_classes import LidarPointCloud, RadarPointCloud
 
 from src import (
     annotation_velocity,
@@ -23,8 +22,9 @@ from src import (
     lidar_velocity,
     radar_velocity,
     sensor_observation,
+    camera，
+
 )
 
 
-print(f"Python interpreter: {sys.executable}")
 print("All core libraries and velocity/efficiency modules imported successfully!")
