@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env/
+venv/
+env/
+
+# VS Code
+.vscode/
+
+# Datasets
+data/
+
+man-truckscenes_sensordata_v1.2-mini/
