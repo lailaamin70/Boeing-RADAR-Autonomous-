@@ -1,17 +1,5 @@
 """
 Wrapper around truckscenes-devkit for the dashboard.
-
-This module intentionally keeps ALL devkit-specific quirks in one place so
-routes.py never has to know about them. Two things learned the hard way
-during notebook development are encoded here:
-
-1. `RadarPointCloud.disable_filters()` does not exist in this fork of the
-   devkit. Instead we inspect `RadarPointCloud.from_file`'s signature at
-   runtime and only pass kwargs it actually accepts (`RADAR_KWARGS`).
-2. The radar point array is a 7-row schema: [x, y, z, vx, vy, vz, rcs] -
-   NOT the 18-row nuScenes layout. Row indices below are confirmed, not
-   assumed. If you point this at a different devkit version, re-verify
-   with `points.shape` before trusting these indices.
 """
 import inspect
 import io
@@ -39,8 +27,7 @@ _trucksc = None
 def _build_radar_kwargs():
     """
     Build a passthrough kwargs dict for RadarPointCloud.from_file based on
-    whatever filter-related parameters this devkit build actually exposes,
-    instead of assuming disable_filters() is available.
+    the filter-related parameters the devkit build exposes.
     """
     try:
         sig = inspect.signature(RadarPointCloud.from_file)

@@ -2,28 +2,24 @@
 Cross-scene analysis: aggregate per-modality sensor stats for comparison
 across scenes / conditions.
 
-Two tiers of metrics, mirroring the cost tradeoff already hit in the
-notebook analysis:
-
+Two types of metrics:
   - "cheap" metrics come straight out of the JSON tables already loaded in
     memory (sample_annotation counts, visibility, sample_data counts).
-    Cheap enough to compute across every scene, every request.
   - "expensive" metrics open the actual sensor sweep binaries to compute
-    point counts, range/azimuth coverage, velocity, RCS. To keep the page
-    responsive these are computed from ONE representative sample per scene
-    (the first keyframe) rather than every sample, and cached in-process
-    per scene token so repeat requests (e.g. toggling metrics) are fast.
-
-Both caches are plain in-memory dicts that live for the life of the Flask
-process. Fine for a mini-split demo. For trainval-scale browsing, swap
-`_expensive_cache` for a cache persisted to disk (or a small SQLite table)
-built by an offline precompute pass, rather than computing on first request.
+    point counts, range/azimuth coverage, velocity, RCS - across every
+    keyframe in the scene, then averaged. Results are cached to a JSON
+    file on disk (`Config.ANALYSIS_CACHE_PATH`) as well
+    as in memory, and reused across Flask process restarts.
 """
+import json
+import os
+import threading
 from collections import defaultdict
 
 import numpy as np
 
 from app import truckscenes_loader as tsl
+from config import Config
 
 # metric_id -> (label, unit, applicable modalities, cheap?)
 METRICS = {
@@ -41,6 +37,34 @@ METRICS = {
 
 _cheap_cache = {}
 _expensive_cache = {}
+_disk_cache_loaded = False
+_cache_lock = threading.Lock()
+
+
+def _load_disk_cache():
+    global _disk_cache_loaded
+    if _disk_cache_loaded:
+        return
+    with _cache_lock:
+        if _disk_cache_loaded:  # re-check inside the lock
+            return
+        path = Config.ANALYSIS_CACHE_PATH
+        if os.path.isfile(path):
+            try:
+                with open(path, "r") as f:
+                    _expensive_cache.update(json.load(f))
+            except (json.JSONDecodeError, OSError):
+                pass  # corrupt or unreadable cache
+        _disk_cache_loaded = True
+
+
+def _save_disk_cache():
+    path = Config.ANALYSIS_CACHE_PATH
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w") as f:
+        json.dump(_expensive_cache, f)
+    os.replace(tmp_path, path)
 
 
 def metric_catalog():
@@ -101,41 +125,44 @@ def _compute_cheap(scene_token):
 
 
 def _compute_expensive(scene_token):
+    """
+    Point-cloud derived stats averaged across every keyframe in the scene.
+    """
     samples = tsl.list_samples_for_scene(scene_token)
     if not samples:
         return {"lidar": {}, "radar": {}}
 
-    first_sample = samples[0]
     lidar_stats, radar_stats = defaultdict(list), defaultdict(list)
 
-    for _, entry in tsl.get_sample_data_by_channel(first_sample["token"]).items():
-        sd_token = entry["sample_data"]["token"]
+    for sample in samples:
+        for _, entry in tsl.get_sample_data_by_channel(sample["token"]).items():
+            sd_token = entry["sample_data"]["token"]
 
-        if entry["modality"] == "lidar":
-            pts = tsl.load_lidar_points(sd_token)
-            if len(pts) == 0:
-                continue
-            r = np.sqrt(pts[:, 0] ** 2 + pts[:, 1] ** 2)
-            az = np.degrees(np.arctan2(pts[:, 1], pts[:, 0]))
-            lidar_stats["sweep_point_count"].append(len(pts))
-            lidar_stats["range_coverage"].append(float(r.max()))
-            lidar_stats["azimuth_coverage"].append(float(az.max() - az.min()))
+            if entry["modality"] == "lidar":
+                pts = tsl.load_lidar_points(sd_token)
+                if len(pts) == 0:
+                    continue
+                r = np.sqrt(pts[:, 0] ** 2 + pts[:, 1] ** 2)
+                az = np.degrees(np.arctan2(pts[:, 1], pts[:, 0]))
+                lidar_stats["sweep_point_count"].append(len(pts))
+                lidar_stats["range_coverage"].append(float(r.max()))
+                lidar_stats["azimuth_coverage"].append(float(az.max() - az.min()))
 
-        elif entry["modality"] == "radar":
-            pts = tsl.load_radar_points(sd_token)
-            if len(pts) == 0:
-                continue
-            x, y = pts[:, tsl.RADAR_ROW["x"]], pts[:, tsl.RADAR_ROW["y"]]
-            vx, vy = pts[:, tsl.RADAR_ROW["vx"]], pts[:, tsl.RADAR_ROW["vy"]]
-            rcs = pts[:, tsl.RADAR_ROW["rcs"]]
-            r = np.sqrt(x ** 2 + y ** 2)
-            az = np.degrees(np.arctan2(y, x))
-            speed = np.sqrt(vx ** 2 + vy ** 2)
-            radar_stats["sweep_point_count"].append(len(pts))
-            radar_stats["range_coverage"].append(float(r.max()))
-            radar_stats["azimuth_coverage"].append(float(az.max() - az.min()))
-            radar_stats["mean_speed"].append(float(speed.mean()))
-            radar_stats["mean_rcs"].append(float(rcs.mean()))
+            elif entry["modality"] == "radar":
+                pts = tsl.load_radar_points(sd_token)
+                if len(pts) == 0:
+                    continue
+                x, y = pts[:, tsl.RADAR_ROW["x"]], pts[:, tsl.RADAR_ROW["y"]]
+                vx, vy = pts[:, tsl.RADAR_ROW["vx"]], pts[:, tsl.RADAR_ROW["vy"]]
+                rcs = pts[:, tsl.RADAR_ROW["rcs"]]
+                r = np.sqrt(x ** 2 + y ** 2)
+                az = np.degrees(np.arctan2(y, x))
+                speed = np.sqrt(vx ** 2 + vy ** 2)
+                radar_stats["sweep_point_count"].append(len(pts))
+                radar_stats["range_coverage"].append(float(r.max()))
+                radar_stats["azimuth_coverage"].append(float(az.max() - az.min()))
+                radar_stats["mean_speed"].append(float(speed.mean()))
+                radar_stats["mean_rcs"].append(float(rcs.mean()))
 
     return {
         "lidar": {k: _mean(v) for k, v in lidar_stats.items()},
@@ -149,8 +176,12 @@ def compute_scene_metrics(scene_token, include_expensive=False):
     result = {k: dict(v) for k, v in _cheap_cache[scene_token].items()}
 
     if include_expensive:
+        _load_disk_cache()
         if scene_token not in _expensive_cache:
-            _expensive_cache[scene_token] = _compute_expensive(scene_token)
+            with _cache_lock:
+                if scene_token not in _expensive_cache:  # re-check inside the lock
+                    _expensive_cache[scene_token] = _compute_expensive(scene_token)
+                    _save_disk_cache()
         for modality, vals in _expensive_cache[scene_token].items():
             result.setdefault(modality, {}).update(vals)
 

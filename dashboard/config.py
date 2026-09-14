@@ -22,3 +22,9 @@ class Config:
 
     SCENES_PER_PAGE = 12
     SAMPLES_PER_PAGE = 20
+
+    # Where per-scene expensive analysis metrics are cached on disk
+    ANALYSIS_CACHE_PATH = os.environ.get(
+        "ANALYSIS_CACHE_PATH",
+        os.path.join(BASE_DIR, "instance", "analysis_expensive_cache.json"),
+    )
