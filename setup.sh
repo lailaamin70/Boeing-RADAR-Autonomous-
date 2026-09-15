@@ -177,11 +177,13 @@ ensure_aws_cli() {
       local tmp_dir
       tmp_dir="$(mktemp -d)"
       if [ "$OS_NAME" = "linux" ]; then
-        curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "$tmp_dir/awscliv2.zip" \
+        info "Downloading AWS CLI installer..."
+        curl -fL --progress-bar "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "$tmp_dir/awscliv2.zip" \
           && unzip -q "$tmp_dir/awscliv2.zip" -d "$tmp_dir" \
           && sudo "$tmp_dir/aws/install"
       elif [ "$OS_NAME" = "macos" ]; then
-        curl -fsSL "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "$tmp_dir/AWSCLIV2.pkg" \
+        info "Downloading AWS CLI installer..."
+        curl -fL --progress-bar "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "$tmp_dir/AWSCLIV2.pkg" \
           && sudo installer -pkg "$tmp_dir/AWSCLIV2.pkg" -target /
       fi
       rm -rf "$tmp_dir"
@@ -201,19 +203,86 @@ ensure_aws_cli() {
 # ---------------------------------------------------------------------------
 # Step 2: download the dataset
 # ---------------------------------------------------------------------------
+ensure_unzip() {
+  if command -v unzip >/dev/null 2>&1; then
+    return
+  fi
+
+  warn "'unzip' not found — it's needed to extract the downloaded dataset archives."
+  detect_platform
+
+  if [ "$PKG_MANAGER" = "none" ]; then
+    fail "No supported package manager detected to install unzip. Please install it yourself and re-run this script."
+  fi
+
+  if confirm "Install 'unzip' using $PKG_MANAGER (may prompt for sudo)?"; then
+    pkg_install unzip || true
+  else
+    info "Skipped unzip install."
+  fi
+
+  command -v unzip >/dev/null 2>&1 \
+    || fail "'unzip' is not installed. Please install it yourself and re-run this script."
+}
+
+zip_is_valid() {
+  # Quiet integrity test; returns 0 only if the archive is complete and uncorrupted.
+  unzip -tq "$1" >/dev/null 2>&1
+}
+
 download_dataset() {
-  if [ "$FORCE_DATA" -eq 0 ] && [ -d "$DATASET_DIR" ] \
+  if [ "$FORCE_DATA" -eq 1 ]; then
+    info "--force-data given: clearing any existing dataset zips and extracted files."
+    rm -rf "$DATASET_DIR"
+    find "$DATA_DIR" -maxdepth 1 -name 'man-truckscenes_*.zip' -exec rm -f {} +
+  fi
+
+  if [ -d "$DATASET_DIR" ] \
      && [ -n "$(find "$DATASET_DIR" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
-    ok "Dataset already present at $DATASET_DIR (use --force-data to re-sync)"
+    ok "Dataset already extracted at $DATASET_DIR (use --force-data to re-download)"
     return
   fi
 
   mkdir -p "$DATA_DIR"
-  info "Downloading MAN TruckScenes ($DATASET_VERSION) from S3 — this can take a while..."
+
+  # Drop any zip that exists but fails an integrity check
+  local zip_path
+  while IFS= read -r -d '' zip_path; do
+    if ! zip_is_valid "$zip_path"; then
+      warn "Found a corrupt/incomplete archive, removing: $(basename "$zip_path")"
+      rm -f "$zip_path"
+    fi
+  done < <(find "$DATA_DIR" -maxdepth 1 -name 'man-truckscenes_*.zip' -print0 2>/dev/null)
+
+  info "Syncing MAN TruckScenes ($DATASET_VERSION) archives from S3 (skips files already downloaded and unchanged)..."
   aws s3 sync --no-sign-request "$S3_URI" "$DATA_DIR/" \
     || fail "Dataset download failed. Check your internet connection and try again."
 
-  ok "Dataset downloaded to $DATASET_DIR"
+  # Collect the zips to extract, verifying each one first.
+  local zips=()
+  while IFS= read -r -d '' zip_path; do
+    zips+=("$zip_path")
+  done < <(find "$DATA_DIR" -maxdepth 1 -name 'man-truckscenes_*.zip' -print0 2>/dev/null)
+
+  [ "${#zips[@]}" -gt 0 ] \
+    || fail "No dataset archives found in $DATA_DIR after syncing — check the S3 path is correct."
+
+  for zip_path in "${zips[@]}"; do
+    zip_is_valid "$zip_path" \
+      || fail "Downloaded archive is corrupt: $(basename "$zip_path"). Delete it and re-run this script (or use --force-data) to retry the download."
+  done
+
+  info "Extracting dataset archives into $DATA_DIR (this can take a while)..."
+  for zip_path in "${zips[@]}"; do
+    info "  Extracting $(basename "$zip_path")..."
+    unzip -o "$zip_path" -d "$DATA_DIR" \
+      || fail "Failed to extract $(basename "$zip_path")."
+  done
+
+  [ -d "$DATASET_DIR" ] \
+    || fail "Extraction finished but $DATASET_DIR was not created — check the archive layout matches what this script expects."
+
+  ok "Dataset downloaded and extracted to $DATASET_DIR"
 }
 
 # ---------------------------------------------------------------------------
@@ -266,25 +335,33 @@ ensure_python311() {
 }
 
 ensure_venv() {
-  if [ -x "$VENV_DIR/bin/python" ]; then
+  if [ -x "$VENV_DIR/bin/python" ] && [ -x "$VENV_DIR/bin/pip" ] \
+     && "$VENV_DIR/bin/python" -c '' >/dev/null 2>&1 \
+     && "$VENV_DIR/bin/pip" --version >/dev/null 2>&1; then
     ok "Virtualenv already exists at $VENV_DIR"
-  else
-    info "Creating virtualenv at $VENV_DIR using $PY_BIN..."
-    "$PY_BIN" -m venv "$VENV_DIR" \
-      || fail "Failed to create the virtualenv. On Debian/Ubuntu you may need: sudo apt-get install python3.11-venv"
-    ok "Virtualenv created"
+    return
   fi
+
+  if [ -e "$VENV_DIR" ]; then
+    warn "Existing virtualenv at $VENV_DIR looks broken (stale/relocated path) — recreating it."
+    rm -rf "$VENV_DIR"
+  fi
+
+  info "Creating virtualenv at $VENV_DIR using $PY_BIN..."
+  "$PY_BIN" -m venv "$VENV_DIR" \
+    || fail "Failed to create the virtualenv. On Debian/Ubuntu you may need: sudo apt-get install python3.11-venv"
+  ok "Virtualenv created"
 }
 
 install_requirements() {
   [ -f "$REQUIREMENTS_FILE" ] || fail "Could not find requirements.txt at $REQUIREMENTS_FILE"
 
-  info "Installing Python dependencies"
-  "$VENV_DIR/bin/pip" install --upgrade pip -q
-  "$VENV_DIR/bin/pip" install -r "$REQUIREMENTS_FILE" -q \
-    || fail "pip install -r requirements.txt failed"
-  "$VENV_DIR/bin/pip" install "truckscenes-devkit[all]" -q \
-    || fail "pip install truckscenes-devkit[all] failed"
+  info "Installing Python dependencies (this is skipped fast on re-runs if already satisfied)..."
+  "$VENV_DIR/bin/pip" install --upgrade pip
+  "$VENV_DIR/bin/pip" install -r "$REQUIREMENTS_FILE" \
+    || fail "pip install -r requirements.txt failed — see the error above."
+  "$VENV_DIR/bin/pip" install "truckscenes-devkit[all]" \
+    || fail "pip install truckscenes-devkit[all] failed — see the error above."
   ok "Python dependencies installed"
 }
 
@@ -307,6 +384,7 @@ main() {
   info "=== CITS3200 TruckScenes dashboard setup ==="
 
   ensure_aws_cli
+  ensure_unzip
   download_dataset
   ensure_python311
   ensure_venv
