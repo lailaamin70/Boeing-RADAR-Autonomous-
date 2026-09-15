@@ -2,17 +2,17 @@
 __pycache__/
 *.pyc
 .venv/
-.env/
 venv/
-env/
 
 # VS Code
 .vscode/
 
-# Datasets
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# TruckScenes dataset
 data/
 
-# Mac
+# OS/editor files
 .DS_Store
-
-man-truckscenes_sensordata_v1.2-mini/
+Thumbs.db
