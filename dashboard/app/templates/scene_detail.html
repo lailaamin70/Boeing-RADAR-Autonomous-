@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ scene.name }} — TruckScenes Explorer{% endblock %}
+
+{% block content %}
+  <div class="mb-3">
+    <a href="{{ url_for('dashboard.index') }}" class="text-dim text-decoration-none">&larr; Scenes</a>
+  </div>
+
+  <h1 class="h4 mb-1">{{ scene.name }}</h1>
+  <div class="text-dim mono mb-3">{{ scene.token }}</div>
+
+  <div class="mb-4">
+    {% for tag in tags %}
+      <span class="tag">{{ tag }}</span>
+    {% endfor %}
+  </div>
+
+  <div class="panel mb-4">
+    <div class="row">
+      <div class="col-sm-4"><span class="text-dim">Samples</span><br>{{ scene.nbr_samples }}</div>
+      <div class="col-sm-8"><span class="text-dim">Description</span><br>{{ scene.description }}</div>
+    </div>
+  </div>
+
+  <h2 class="h6 text-dim mb-2">Samples (2 Hz keyframes)</h2>
+  <div class="sample-strip">
+    {% for sample in samples %}
+      <a href="{{ url_for('dashboard.sample_detail', sample_token=sample.token) }}"
+         class="sample-dot mono" title="{{ sample.timestamp }}">{{ loop.index }}</a>
+    {% endfor %}
+  </div>
+{% endblock %}

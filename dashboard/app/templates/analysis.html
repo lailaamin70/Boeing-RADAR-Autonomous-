@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Analysis — TruckScenes Explorer{% endblock %}
+
+{% block content %}
+  <h1 class="h4 mb-1">Cross-scene analysis</h1>
+  <div class="text-dim mb-4">Compare radar, lidar and camera across conditions or individual scenes.</div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-3">
+      <div class="panel mb-3">
+        <div class="text-dim mb-2" style="font-size:.78rem">Group by</div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="group_by" id="group-tag" value="tag" checked>
+          <label class="form-check-label" for="group-tag">Condition / tag</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="group_by" id="group-scene" value="scene">
+          <label class="form-check-label" for="group-scene">Individual scene</label>
+        </div>
+      </div>
+
+      <div class="panel mb-3">
+        <div class="text-dim mb-2" style="font-size:.78rem">Conditions</div>
+        {% if all_tags %}
+          <div style="max-height:220px; overflow-y:auto">
+            {% for tag in all_tags %}
+              <div class="form-check">
+                <input class="form-check-input tag-check" type="checkbox" value="{{ tag }}" id="tag-{{ loop.index }}">
+                <label class="form-check-label" for="tag-{{ loop.index }}">{{ tag }}</label>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="text-dim mt-1" style="font-size:.72rem">None selected = every condition seen</div>
+        {% else %}
+          <div class="text-dim" style="font-size:.85rem">No scene tags found.</div>
+        {% endif %}
+      </div>
+
+      <div class="panel mb-3">
+        <div class="text-dim mb-2" style="font-size:.78rem">Metrics</div>
+        {% for m in metrics %}
+          <div class="form-check">
+            <input class="form-check-input metric-check" type="checkbox" value="{{ m.id }}" id="metric-{{ m.id }}"
+              {{ 'checked' if m.id in ['sweep_point_count', 'mean_speed', 'visibility'] else '' }}>
+            <label class="form-check-label" for="metric-{{ m.id }}" style="font-size:.88rem">
+              {{ m.label }}<br>
+              {% for mod in m.modalities %}
+                <span class="tag badge-{{ mod if mod != 'general' else 'camera' }}" style="font-size:.65rem">{{ mod }}</span>
+              {% endfor %}
+              {% if not m.cheap %}<span class="tag" style="font-size:.65rem">reads sensor files</span>{% endif %}
+            </label>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="panel">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="include-expensive">
+          <label class="form-check-label" for="include-expensive" style="font-size:.85rem">
+            Compute point-cloud metrics
+            <div class="text-dim" style="font-size:.72rem">Opens sensor files for the first keyframe of each scene involved. Slower, cached after first run.</div>
+          </label>
+        </div>
+        <button id="apply-btn" class="btn btn-accent btn-sm w-100">Apply</button>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-9">
+      <div id="status" class="text-dim mb-3"></div>
+      <div id="charts"></div>
+      <div class="panel mb-3"><div class="mb-2">
+          <div class="mb-2">Table: Raw Data</div>
+          <div id="table-wrap" class="mt-2"></div>
+      </div><canvas></canvas></div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>window.ANALYSIS_API = "{{ url_for('dashboard.api_analysis') }}";</script>
+<script src="{{ url_for('static', filename='js/analysis.js') }}"></script>
+{% endblock %}
