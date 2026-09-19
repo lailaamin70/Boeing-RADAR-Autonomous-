@@ -17,16 +17,17 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = PROJECT_ROOT / "data" / "man-truckscenes"
 
 VERSION = "v1.2-mini"
+TRAINVAL_VERSION = "v1.2-trainval"
 
 
 # Derived dataset paths
 SENSOR_ROOT = DATA_ROOT / "man-truckscenes"
 
 SAMPLES_ROOT = SENSOR_ROOT / "samples"
-
 SWEEPS_ROOT = SENSOR_ROOT / "sweeps"
 
 METADATA_ROOT = DATA_ROOT / VERSION
+TRAINVAL_METADATA_ROOT = DATA_ROOT / TRAINVAL_VERSION
 
 
 # Shared timestamp conversion

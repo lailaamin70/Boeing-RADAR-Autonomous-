@@ -361,3 +361,46 @@ def add_reference_velocity(annotation_pairs):
     ) ** 0.5
 
     return result
+
+def add_scene_tokens(annotation_pairs, samples):
+    """
+    Add scene tokens to annotation-pair data using the start sample token.
+
+    Parameters
+    ----------
+    annotation_pairs : pandas.DataFrame
+        Annotation-pair table containing start_sample_token.
+
+    samples : list
+        Records loaded from sample.json.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Annotation-pair table with scene_token added.
+    """
+
+    if "start_sample_token" not in annotation_pairs.columns:
+        raise ValueError(
+            "annotation_pairs is missing required column: "
+            "start_sample_token"
+        )
+
+    sample_to_scene = {
+        sample["token"]: sample["scene_token"]
+        for sample in samples
+    }
+
+    result = annotation_pairs.copy()
+
+    result["scene_token"] = (
+        result["start_sample_token"]
+        .map(sample_to_scene)
+    )
+
+    if result["scene_token"].isna().any():
+        raise ValueError(
+            "Some sample tokens could not be matched to a scene."
+        )
+
+    return result
