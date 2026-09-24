@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>TruckScenes Sensor Benchmark Demo</title>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <div class="dashboard">
+
+    <!-- Left Filter Panel -->
+    <aside class="filter-panel">
+
+      <h2>Filters</h2>
+
+      <label for="weather">Weather</label>
+      <select id="weather">
+        <option>All</option>
+        <option>Clear</option>
+        <option>Rain</option>
+        <option>Overcast</option>
+      </select>
+
+      <label for="area">Area</label>
+      <select id="area">
+        <option>All</option>
+        <option>Highway</option>
+        <option>City</option>
+        <option>Rural</option>
+        <option>Terminal</option>
+      </select>
+
+      <label for="object-type">Object Type</label>
+      <select id="object-type">
+        <option>All</option>
+        <option>Truck</option>
+        <option>Car</option>
+        <option>Bus</option>
+      </select>
+
+      <label for="distance">Distance Range</label>
+      <select id="distance">
+        <option>All</option>
+        <option>0-20 m</option>
+        <option>20-40 m</option>
+        <option>40-60 m</option>
+        <option>60+ m</option>
+      </select>
+
+      <label for="sample-token">Sample Token</label>
+      <input
+        type="text"
+        id="sample-token"
+        placeholder="Enter sample token"
+      >
+
+      <button id="reset-button">Reset Filters</button>
+
+    </aside>
+
+
+    <!-- Main Dashboard -->
+    <main class="main-content">
+
+      <!-- Header -->
+      <header class="page-header">
+
+        <h1>4D RADAR vs LiDAR Benchmark</h1>
+
+        <p>
+          Interactive TruckScenes v1.2-mini sensor comparison prototype
+        </p>
+
+      </header>
+
+
+      <!-- Result Summary -->
+      <section class="result-summary">
+
+        <div>
+          <strong>Matching Objects</strong>
+          <span>4</span>
+        </div>
+
+        <div>
+          <strong>Matching Samples</strong>
+          <span>3</span>
+        </div>
+
+        <div>
+          <strong>Result</strong>
+          <span>1 / 4</span>
+        </div>
+
+        <div class="navigation-buttons">
+
+          <button id="previous-button">
+            Previous
+          </button>
+
+          <button id="next-button">
+            Next
+          </button>
+
+        </div>
+
+      </section>
+
+
+      <!-- Sensor Visualisations -->
+      <section class="sensor-grid">
+
+        <!-- Camera -->
+        <div class="sensor-card">
+
+          <h3>Camera</h3>
+
+          <p class="sensor-description">
+            See the driving scene from the vehicle's perspective, with ground-truth objects highlighted across the available camera views.
+          </p>
+
+          <h4>Camera + Ground Truth</h4>
+
+          <img
+            class="visualisation-image camera-image"
+            src="assets/sample1_camera.png"
+            alt="Camera views with ground truth objects"
+          >
+
+        </div>
+
+
+        <!-- LiDAR -->
+        <div class="sensor-card">
+
+          <h3>LiDAR</h3>
+
+          <p class="sensor-description">
+            Explore dense 3D geometry and bird's-eye spatial structure captured by LiDAR around the ego vehicle.
+          </p>
+
+          <h4>Interactive 3D Point Cloud</h4>
+
+          <iframe
+            class="visualisation-3d"
+            src="assets/sample1_lidar_3d.html"
+            title="LiDAR interactive 3D point cloud">
+          </iframe>
+
+          <h4>Bird's-Eye View</h4>
+
+          <img
+            class="visualisation-image"
+            src="assets/sample1_lidar_bev.png"
+            alt="LiDAR bird's-eye view"
+          >
+
+        </div>
+
+
+        <!-- RADAR -->
+        <div class="sensor-card">
+
+          <h3>4D RADAR</h3>
+
+          <p class="sensor-description">
+            Explore sparse RADAR returns in 3D and bird's-eye view, revealing a complementary sensing perspective to LiDAR.
+          </p>
+
+          <h4>Interactive 3D Point Cloud</h4>
+
+          <iframe
+            class="visualisation-3d"
+            src="assets/sample1_radar_3d.html"
+            title="RADAR interactive 3D point cloud">
+          </iframe>
+
+          <h4>Bird's-Eye View</h4>
+
+          <img
+            class="visualisation-image"
+            src="assets/sample1_radar_bev.png"
+            alt="RADAR bird's-eye view"
+          >
+
+        </div>
+
+      </section>
+
+
+      <!-- Combined Sensor View -->
+      <section class="panel">
+
+        <h2>LiDAR + RADAR Combined View</h2>
+
+        <p class="sensor-description">
+          See both sensing modalities in the same coordinate space, making differences in spatial coverage, point density and sensing characteristics immediately visible.
+        </p>
+
+        <div class="combined-grid">
+
+          <!-- Combined 3D -->
+          <div>
+
+            <h4>
+              Interactive Combined 3D Point Cloud
+            </h4>
+
+            <iframe
+              class="combined-3d"
+              src="assets/sample1_combined_3d.html"
+              title="Combined LiDAR and RADAR interactive 3D point cloud">
+            </iframe>
+
+          </div>
+
+
+          <!-- Combined BEV -->
+          <div>
+
+            <h4>
+              Combined Bird's-Eye View
+            </h4>
+
+            <img
+              class="combined-image"
+              src="assets/sample1_combined_bev.png"
+              alt="Combined LiDAR and RADAR bird's-eye view"
+            >
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- Selected Object Information -->
+      <section class="panel">
+
+        <h2>Selected Object Information</h2>
+
+        <p class="sensor-description">
+          Inspect the selected object's sensing information across Camera, LiDAR and 4D RADAR from the same TruckScenes sample.
+        </p>
+
+        <div class="object-info">
+
+          <p>
+            <strong>Object Type</strong>
+            Truck
+          </p>
+
+          <p>
+            <strong>Distance</strong>
+            22.26 m
+          </p>
+
+          <p>
+            <strong>Visibility</strong>
+            4
+          </p>
+
+          <p>
+            <strong>LiDAR Points</strong>
+            877
+          </p>
+
+          <p>
+            <strong>RADAR Returns</strong>
+            6
+          </p>
+
+          <p>
+            <strong>Camera Views</strong>
+            1
+          </p>
+
+        </div>
+
+      </section>
+
+
+      <!-- Sensor Comparison -->
+      <section class="panel">
+
+        <h2>Sensor Comparison</h2>
+
+        <p class="sensor-description">
+          One driving scene, multiple sensing perspectives — revealing how Camera, LiDAR and 4D RADAR represent the same environment in fundamentally different ways.
+        </p>
+
+        <div class="comparison-grid">
+
+          <div class="comparison-item">
+
+            <h4>Motion Information</h4>
+
+            <p>
+              Compare how directly each sensor contributes information about object movement and dynamic behaviour.
+            </p>
+
+          </div>
+
+
+          <div class="comparison-item">
+
+            <h4>Spatial Information</h4>
+
+            <p>
+              Compare point density, 3D geometry and spatial coverage across LiDAR and RADAR.
+            </p>
+
+          </div>
+
+
+          <div class="comparison-item">
+
+            <h4>Visual Information</h4>
+
+            <p>
+              Connect sensor measurements with the visual driving context captured by the vehicle cameras.
+            </p>
+
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+</body>
+</html>

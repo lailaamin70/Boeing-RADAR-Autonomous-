@@ -241,6 +241,7 @@ def plot_lidar_bev_with_boxes(
     highlight_distance_range=None,
     x_range=(-50, 100),
     y_range=(-50, 50),
+    save_path=None,
 ):
     """Plot LiDAR BEV with highlighted Ground Truth objects."""
 
@@ -339,6 +340,14 @@ def plot_lidar_bev_with_boxes(
     ax.legend()
 
     plt.tight_layout()
+
+    if save_path is not None:
+        fig.savefig(
+            save_path,
+            dpi=200,
+            bbox_inches="tight",
+        )
+
     plt.show()
 
 
@@ -351,6 +360,7 @@ def plot_lidar_3d_with_boxes(
     y_range=(-50, 50),
     z_range=(-5, 10),
     max_points=100000,
+    save_path=None,
 ):
     """Plot interactive 3D LiDAR point cloud with highlighted GT boxes."""
 
@@ -587,6 +597,12 @@ def plot_lidar_3d_with_boxes(
         ),
     )
 
+    if save_path is not None:
+        fig.write_html(
+            save_path,
+            include_plotlyjs=True,
+        )
+
     fig.show()
 
 
@@ -701,6 +717,7 @@ def plot_radar_bev_with_boxes(
     highlight_distance_range=None,
     x_range=(-50, 100),
     y_range=(-50, 50),
+    save_path=None,
 ):
     """Plot RADAR BEV with highlighted Ground Truth objects."""
 
@@ -810,6 +827,12 @@ def plot_radar_bev_with_boxes(
     cbar.set_label("Radar Cross Section (RCS)")
 
     plt.tight_layout()
+    if save_path is not None:
+        fig.savefig(
+            save_path,
+            dpi=200,
+            bbox_inches="tight",
+        )
     plt.show()
 
 
@@ -821,6 +844,7 @@ def plot_radar_3d_with_boxes(
     x_range=(-50, 100),
     y_range=(-50, 50),
     z_range=(-5, 10),
+    save_path=None,
 ):
     """Plot interactive 3D RADAR returns with highlighted GT boxes."""
 
@@ -1042,6 +1066,12 @@ def plot_radar_3d_with_boxes(
         ),
     )
 
+    if save_path is not None:
+        fig.write_html(
+            save_path,
+            include_plotlyjs=True,
+        )
+
     fig.show()
 
 
@@ -1190,6 +1220,7 @@ def plot_all_camera_views(
     sensor_root=None,
     highlight_category=None,
     highlight_distance_range=None,
+    save_path=None,
 ):
     """Plot all four Camera views for one sample with projected GT boxes."""
 
@@ -1359,6 +1390,12 @@ def plot_all_camera_views(
     )
 
     plt.tight_layout()
+    if save_path is not None:
+        fig.savefig(
+            save_path,
+            dpi=200,
+            bbox_inches="tight",
+        )
     plt.show()
 
 
