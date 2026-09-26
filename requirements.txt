@@ -1,0 +1,21 @@
+# Core data analysis
+numpy
+pandas
+scipy
+
+# Visualisation
+matplotlib
+plotly
+
+# Progress bars
+tqdm
+
+# Machine learning / robust estimation
+scikit-learn
+
+# TruckScenes SDK
+truckscenes-devkit==1.2.0
+
+# Jupyter / VS Code notebooks
+jupyter
+ipykernel
