@@ -85,3 +85,22 @@ def create_distance_bands(distance, bin_width=DISTANCE_BIN_WIDTH):
     bins = np.arange(0, upper_bound + bin_width, bin_width)
 
     return pd.cut(distance, bins=bins, right=False)
+
+
+def build_condition_inventory(condition_df, conditions):
+    """Summarise available values and sample sizes for each condition."""
+
+    rows = []
+
+    for condition in conditions:
+        for value, group in condition_df.groupby(condition, observed=True):
+            rows.append({
+                "condition": condition,
+                "value": value,
+                "scenes": group["scene_token"].nunique(),
+                "samples": group["sample_token"].nunique(),
+                "objects": group["instance_token"].nunique(),
+                "annotations": group["annotation_token"].nunique(),
+            })
+
+    return pd.DataFrame(rows)
