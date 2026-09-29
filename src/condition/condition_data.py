@@ -23,29 +23,23 @@ def parse_scene_description(description):
     return conditions
 
 
-def build_condition_table(trucksc):
-    """
-    Build one annotation-level table containing all analysis conditions.
-
-    Output columns:
-        annotation_token
-        sample_token
-        scene_token
-        area
-        weather
-        visibility
-        object_type
-        distance
-    """
+def build_condition_table(trucksc, sample_tokens=None):
+    """Build one annotation-level table containing all analysis conditions."""
 
     sample_lookup = {x["token"]: x for x in trucksc.sample}
     scene_lookup = {x["token"]: x for x in trucksc.scene}
     visibility_lookup = {x["token"]: x for x in trucksc.visibility}
     ego_pose_lookup = {x["token"]: x for x in trucksc.ego_pose}
 
+    if sample_tokens is not None:
+        sample_tokens = set(sample_tokens)
+
     rows = []
 
     for ann in trucksc.sample_annotation:
+        if sample_tokens is not None and ann["sample_token"] not in sample_tokens:
+            continue
+
         sample = sample_lookup[ann["sample_token"]]
         scene = scene_lookup[sample["scene_token"]]
         visibility = visibility_lookup[ann["visibility_token"]]
@@ -69,6 +63,10 @@ def build_condition_table(trucksc):
         })
 
     df = pd.DataFrame(rows)
+
+    if df.empty:
+        raise ValueError("No condition records were created.")
+
     df["distance"] = create_distance_bands(df["distance_3d"])
 
     return df

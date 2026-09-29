@@ -18,100 +18,174 @@ from .data_io import load_json
 TIMESTAMP_UNITS_PER_SECOND = 1_000_000
 
 
-def build_sensor_data_df(metadata_root=None):
+def build_sensor_data_df(
+    metadata_root=None,
+    sample_data_df=None,
+):
     """
     Build a sensor observation table from TruckScenes metadata.
     Includes samples and sweeps for RADAR, LiDAR, and Camera.
-
-    Parameters
-    ----------
-    metadata_root : str or Path, optional
-        Metadata directory. Uses METADATA_ROOT by default.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Sensor observation metadata.
-
-    Notes
-    -----
-    Timestamps are preserved in microseconds (µs).
     """
 
     metadata_root = Path(metadata_root or METADATA_ROOT)
 
     if not metadata_root.exists():
-        raise FileNotFoundError(f"Metadata directory not found: {metadata_root}")
+        raise FileNotFoundError(
+            f"Metadata directory not found: {metadata_root}"
+        )
 
     required_files = [
         "sample.json",
-        "sample_data.json",
         "calibrated_sensor.json",
         "sensor.json",
     ]
 
+    if sample_data_df is None:
+        required_files.append("sample_data.json")
+
     for filename in required_files:
         file_path = metadata_root / filename
-        if not file_path.exists():
-            raise FileNotFoundError(f"Required metadata file not found: {file_path}")
 
-    samples = load_json(metadata_root / "sample.json")
-    sample_data = load_json(metadata_root / "sample_data.json")
-    calibrated_sensors = load_json(metadata_root / "calibrated_sensor.json")
-    sensors = load_json(metadata_root / "sensor.json")
+        if not file_path.exists():
+            raise FileNotFoundError(
+                f"Required metadata file not found: {file_path}"
+            )
+
+    samples = load_json(
+        metadata_root / "sample.json"
+    )
+
+    calibrated_sensors = load_json(
+        metadata_root / "calibrated_sensor.json"
+    )
+
+    sensors = load_json(
+        metadata_root / "sensor.json"
+    )
+
+    if sample_data_df is None:
+        sample_data = load_json(
+            metadata_root / "sample_data.json"
+        )
+
+    else:
+        required_columns = {
+            "token",
+            "sample_token",
+            "calibrated_sensor_token",
+            "filename",
+        }
+
+        missing_columns = (
+            required_columns
+            - set(sample_data_df.columns)
+        )
+
+        if missing_columns:
+            raise ValueError(
+                "sample_data_df is missing required columns: "
+                + ", ".join(sorted(missing_columns))
+            )
+
+        sample_data = (
+            sample_data_df
+            .to_dict("records")
+        )
 
     for name, data in {
         "sample.json": samples,
-        "sample_data.json": sample_data,
+        "sample_data": sample_data,
         "calibrated_sensor.json": calibrated_sensors,
         "sensor.json": sensors,
     }.items():
+
         if not isinstance(data, list):
-            raise ValueError(f"{name} is expected to contain a list of records.")
-        if not all(isinstance(record, dict) for record in data):
-            raise ValueError(f"{name} contains one or more non-dictionary records.")
+            raise ValueError(
+                f"{name} is expected to contain "
+                "a list of records."
+            )
+
+        if not all(
+            isinstance(record, dict)
+            for record in data
+        ):
+            raise ValueError(
+                f"{name} contains one or more "
+                "non-dictionary records."
+            )
 
     sample_to_scene = {
         record["token"]: record.get("scene_token")
-        for record in samples if "token" in record
+        for record in samples
+        if "token" in record
     }
+
     calibrated_sensor_lookup = {
         record["token"]: record
-        for record in calibrated_sensors if "token" in record
+        for record in calibrated_sensors
+        if "token" in record
     }
+
     sensor_lookup = {
         record["token"]: record
-        for record in sensors if "token" in record
+        for record in sensors
+        if "token" in record
     }
 
     records = []
     skipped_records = 0
 
     for record in sample_data:
-        sample_token = record.get("sample_token")
-        calibrated_sensor_token = record.get("calibrated_sensor_token")
 
-        if sample_token is None or calibrated_sensor_token is None:
+        sample_token = record.get(
+            "sample_token"
+        )
+
+        calibrated_sensor_token = record.get(
+            "calibrated_sensor_token"
+        )
+
+        if (
+            sample_token is None
+            or calibrated_sensor_token is None
+        ):
             skipped_records += 1
             continue
 
-        calibrated_sensor = calibrated_sensor_lookup.get(calibrated_sensor_token)
+        calibrated_sensor = (
+            calibrated_sensor_lookup.get(
+                calibrated_sensor_token
+            )
+        )
+
         if calibrated_sensor is None:
             skipped_records += 1
             continue
 
-        sensor_token = calibrated_sensor.get("sensor_token")
+        sensor_token = calibrated_sensor.get(
+            "sensor_token"
+        )
+
         if sensor_token is None:
             skipped_records += 1
             continue
 
-        sensor = sensor_lookup.get(sensor_token)
+        sensor = sensor_lookup.get(
+            sensor_token
+        )
+
         if sensor is None:
             skipped_records += 1
             continue
 
-        modality_raw = sensor.get("modality")
-        if not isinstance(modality_raw, str):
+        modality_raw = sensor.get(
+            "modality"
+        )
+
+        if not isinstance(
+            modality_raw,
+            str,
+        ):
             skipped_records += 1
             continue
 
@@ -120,41 +194,81 @@ def build_sensor_data_df(metadata_root=None):
             "radar": "RADAR",
             "camera": "Camera",
         }
-        modality = modality_map.get(modality_raw.lower())
+
+        modality = modality_map.get(
+            modality_raw.lower()
+        )
 
         if modality is None:
             continue
 
-        filename = record.get("filename")
+        filename = record.get(
+            "filename"
+        )
 
         if isinstance(filename, str):
-            if filename.startswith("samples/"):
+
+            if filename.startswith(
+                "samples/"
+            ):
                 data_group = "samples"
-            elif filename.startswith("sweeps/"):
+
+            elif filename.startswith(
+                "sweeps/"
+            ):
                 data_group = "sweeps"
+
             else:
                 data_group = "other"
+
         else:
             filename = None
             data_group = "unknown"
 
         records.append({
-            "Token": record.get("token"),
-            "Sample Token": sample_token,
-            "Scene Token": sample_to_scene.get(sample_token),
-            "Modality": modality,
-            "Sensor": sensor.get("channel"),
-            "Timestamp": record.get("timestamp"),
-            "Is Key Frame": record.get("is_key_frame"),
-            "Data Group": data_group,
-            "Filename": filename,
+            "Token":
+                record.get("token"),
+
+            "Sample Token":
+                sample_token,
+
+            "Scene Token":
+                sample_to_scene.get(
+                    sample_token
+                ),
+
+            "Modality":
+                modality,
+
+            "Sensor":
+                sensor.get("channel"),
+
+            "Timestamp":
+                record.get("timestamp"),
+
+            "Is Key Frame":
+                record.get("is_key_frame"),
+
+            "Data Group":
+                data_group,
+
+            "Filename":
+                filename,
         })
 
     if not records:
-        raise ValueError("No supported sensor observations could be constructed from the metadata.")
+        raise ValueError(
+            "No supported sensor observations "
+            "could be constructed from the metadata."
+        )
 
-    sensor_data_df = pd.DataFrame(records)
-    sensor_data_df.attrs["Skipped Records"] = skipped_records
+    sensor_data_df = pd.DataFrame(
+        records
+    )
+
+    sensor_data_df.attrs[
+        "Skipped Records"
+    ] = skipped_records
 
     return sensor_data_df
 
