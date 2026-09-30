@@ -1,8 +1,10 @@
-"""Convert caller-selected TruckScenes LiDARs for OmniHD LiDAR PointPillars.
+"""Convert caller-selected TruckScenes LiDARs into a common ego-aligned frame.
 
-Intensity is preserved without normalization; cross-dataset intensity calibration
-and point-density changes from combining sensors remain experiment limitations.
-XYZ filtering is left to OmniHD. No channels or reference frame are selected here.
+Each physical sensor is transformed into the caller's current/reference ego
+frame. Intensity is preserved without normalization; cross-dataset intensity
+calibration and point-density changes from combining sensors remain experiment
+limitations. XYZ filtering is left to OmniHD. The caller selects the channels
+and reference ego pose.
 """
 
 from collections.abc import Mapping, Sequence
@@ -12,7 +14,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 from pypcd4 import PointCloud
 
-from .transforms import sensor_to_sensor_transform, transform_points
+from .transforms import sensor_to_ego_reference_transform, transform_points
 
 
 TRUCKSCENES_LIDAR_CHANNELS = (
@@ -85,10 +87,9 @@ def convert_lidar_points(
     intensity: ArrayLike,
     source_calibrated_sensor: dict,
     source_ego_pose: dict,
-    reference_calibrated_sensor: dict,
     reference_ego_pose: dict,
 ) -> np.ndarray:
-    """Return Nx4 reference-frame XYZ and unchanged Nx1 source intensity.
+    """Return Nx4 current/reference ego XYZ and unchanged source intensity.
 
     Source and reference poses may have different timestamps. Inputs are not
     modified. No spatial filtering or per-point motion compensation is applied.
@@ -98,13 +99,12 @@ def convert_lidar_points(
     if xyz.shape[0] != intensity.shape[0]:
         raise ValueError("xyz and intensity must have the same number of points")
 
-    T_reference_from_source = sensor_to_sensor_transform(
+    T_reference_ego_from_source_sensor = sensor_to_ego_reference_transform(
         source_calibrated_sensor,
         source_ego_pose,
-        reference_calibrated_sensor,
         reference_ego_pose,
     )
-    xyz_reference = transform_points(xyz, T_reference_from_source)
+    xyz_reference = transform_points(xyz, T_reference_ego_from_source_sensor)
     return _point_array(
         np.concatenate((xyz_reference, intensity), axis=1), 4, "converted points"
     )
@@ -114,32 +114,29 @@ def convert_lidar_source(
     lidar_path: str | Path,
     source_calibrated_sensor: dict,
     source_ego_pose: dict,
-    reference_calibrated_sensor: dict,
     reference_ego_pose: dict,
 ) -> np.ndarray:
-    """Load one PCD and return Nx4 features in the explicit reference frame."""
+    """Load one PCD and return Nx4 features in the reference ego frame."""
     xyz, intensity = extract_lidar_features(load_truckscenes_lidar(lidar_path))
     return convert_lidar_points(
         xyz,
         intensity,
         source_calibrated_sensor,
         source_ego_pose,
-        reference_calibrated_sensor,
         reference_ego_pose,
     )
 
 
 def combine_lidar_sources(
     sources: Sequence[dict],
-    reference_calibrated_sensor: dict,
     reference_ego_pose: dict,
 ) -> np.ndarray:
-    """Combine exactly the supplied sources into reference-frame Mx4 features.
+    """Combine exactly the supplied sources in the current/reference ego frame.
 
     Each source mapping requires ``channel``, ``lidar_path``,
     ``calibrated_sensor``, and ``ego_pose``. Supply a non-empty sequence with
     unique known LiDAR channels. Source order and point order are preserved.
-    The reference calibration and ego pose are mandatory caller choices.
+    The reference ego pose is a mandatory caller choice.
     """
     if len(sources) == 0:
         raise ValueError("At least one explicit LiDAR source is required")
@@ -168,7 +165,6 @@ def combine_lidar_sources(
             source["lidar_path"],
             source["calibrated_sensor"],
             source["ego_pose"],
-            reference_calibrated_sensor,
             reference_ego_pose,
         )
         for source in sources

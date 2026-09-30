@@ -1,4 +1,4 @@
-"""Convert TruckScenes global annotations into OmniHD reference-sensor boxes."""
+"""Convert TruckScenes global annotations into ego-aligned OmniHD boxes."""
 
 from collections.abc import Mapping, Sequence
 
@@ -6,7 +6,7 @@ import numpy as np
 
 from .class_mapping import OMNIHD_CLASSES, map_truckscenes_category
 from .transforms import (
-    global_to_sensor_transform,
+    global_to_ego_transform,
     quaternion_to_rotation_matrix,
     transform_points,
 )
@@ -49,10 +49,9 @@ def _annotation_identifiers(annotation: Mapping) -> None:
 
 def convert_box_to_reference(
     annotation: Mapping,
-    reference_calibrated_sensor: Mapping,
     reference_ego_pose: Mapping,
 ) -> np.ndarray:
-    """Return a centred OmniHD metadata box ``[x,y,z,w,l,h,yaw]``.
+    """Return a centred OmniHD metadata box ``[x,y,z,w,l,h,yaw]`` in ego.
 
     TruckScenes box centres and quaternions are global. OmniHD's converter
     stores geometric centres and width/length/height in that order. Its
@@ -61,18 +60,20 @@ def convert_box_to_reference(
     dataset loader later shifts the centre to bottom centre using
     ``origin=(0.5, 0.5, 0.5)``. No z shift belongs in this metadata box.
 
-    Full orientation is transformed first; yaw is the horizontal projection
-    of the transformed width axis. Pitch and roll cannot be encoded in 7D.
+    Global geometry is transformed into the caller's current/reference ego
+    frame. This avoids adding physical LiDAR mounting tilt. Full orientation
+    is transformed first; yaw is the horizontal projection of the transformed
+    width axis. Residual pitch and roll cannot be encoded in 7D.
     """
     center_global, size_wlh, R_global_from_box = _geometry(annotation)
-    T_reference_from_global = global_to_sensor_transform(
-        reference_calibrated_sensor, reference_ego_pose
-    )
+    T_reference_ego_from_global = global_to_ego_transform(reference_ego_pose)
     center_reference = transform_points(
-        center_global.reshape(1, 3), T_reference_from_global
+        center_global.reshape(1, 3), T_reference_ego_from_global
     )[0]
-    R_reference_from_box = T_reference_from_global[:3, :3] @ R_global_from_box
-    width_axis_xy = R_reference_from_box[:2, 1]
+    R_reference_ego_from_box = (
+        T_reference_ego_from_global[:3, :3] @ R_global_from_box
+    )
+    width_axis_xy = R_reference_ego_from_box[:2, 1]
     if np.linalg.norm(width_axis_xy) <= np.finfo(float).eps:
         raise ValueError("box width axis has no horizontal projection in reference frame")
     # MMDetection3D v0.17.1 rotates row-vector box corners clockwise for
@@ -88,10 +89,9 @@ def convert_box_to_reference(
 def convert_annotation(
     annotation: Mapping,
     category_name: str,
-    reference_calibrated_sensor: Mapping,
     reference_ego_pose: Mapping,
 ) -> dict | None:
-    """Convert one validated annotation, or exclude a mapped-out category."""
+    """Convert one annotation to reference ego, or exclude a mapped-out class."""
     if not isinstance(annotation, Mapping):
         raise ValueError("annotation must be a mapping")
     _annotation_identifiers(annotation)
@@ -103,7 +103,7 @@ def convert_annotation(
         return None
 
     box = convert_box_to_reference(
-        annotation, reference_calibrated_sensor, reference_ego_pose
+        annotation, reference_ego_pose
     )
     return {
         "box": box,
@@ -123,14 +123,14 @@ def convert_annotation(
 def convert_annotations(
     annotations: Sequence[Mapping],
     category_name_by_instance_token: Mapping[str, str],
-    reference_calibrated_sensor: Mapping,
     reference_ego_pose: Mapping,
 ) -> dict:
-    """Convert a sample's annotations using the caller's instance-category map.
+    """Convert a sample's annotations into the caller's reference ego frame.
 
-    Returns ``gt_boxes`` as centred Nx7 OmniHD metadata boxes, plus names,
-    int64 labels, per-annotation metadata, and inclusion/exclusion counts.
-    Empty included sets retain the unambiguous shapes (0, 7) and (0,).
+    Uses the caller's instance-category map. Returns ``gt_boxes`` as centred
+    Nx7 OmniHD metadata boxes, plus names, int64 labels, per-annotation
+    metadata, and inclusion/exclusion counts. Empty included sets retain the
+    unambiguous shapes (0, 7) and (0,).
     """
     converted = []
     num_input = 0
@@ -146,7 +146,6 @@ def convert_annotations(
         result = convert_annotation(
             annotation,
             category_name_by_instance_token[instance_token],
-            reference_calibrated_sensor,
             reference_ego_pose,
         )
         if result is not None:
