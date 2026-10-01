@@ -80,21 +80,6 @@ def _mean(values):
     return sum(values) / len(values) if values else None
 
 
-def _get_sample_anns(trucksc, sample):
-    """
-    Sample annotation tokens for a sample. Assumes the devkit adds a
-    reverse-lookup `sample['anns']` list at load time (standard nuScenes-
-    style behaviour). Falls back to a linear scan if that assumption turns
-    out to be wrong for this devkit fork - verify with a quick
-    `print(trucksc.sample[0].keys())` if this path gets hit a lot, since
-    the fallback is O(n) per call.
-    """
-    anns = sample.get("anns")
-    if anns is not None:
-        return anns
-    return [a["token"] for a in trucksc.sample_annotation if a["sample_token"] == sample["token"]]
-
-
 def _compute_cheap(scene_token):
     trucksc = tsl.get_trucksc()
     samples = tsl.list_samples_for_scene(scene_token)
@@ -103,7 +88,7 @@ def _compute_cheap(scene_token):
     camera_frames = 0
 
     for sample in samples:
-        for ann_token in _get_sample_anns(trucksc, sample):
+        for ann_token in tsl.get_sample_annotations(sample["token"]):
             ann = trucksc.get("sample_annotation", ann_token)
             if ann.get("visibility_token"):
                 vis = trucksc.get("visibility", ann["visibility_token"])

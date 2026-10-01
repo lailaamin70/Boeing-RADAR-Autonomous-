@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}{{ scene.name }} — Scene viewer{% endblock %}
+
+{% block content %}
+  <div class="mb-3">
+    <a href="{{ url_for('dashboard.scene_detail', scene_token=scene.token) }}" class="text-dim text-decoration-none">
+      &larr; {{ scene.name }}
+    </a>
+  </div>
+
+  <h1 class="h4 mb-1">Scene viewer</h1>
+  <div class="text-dim mono mb-3">{{ scene.token }}</div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-3">
+      <div class="panel mb-3">
+        <div class="text-dim mb-2" style="font-size:.78rem">View</div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="view_mode" id="view-topdown" value="topdown" checked>
+          <label class="form-check-label" for="view-topdown">Top-down</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="view_mode" id="view-3d" value="3d">
+          <label class="form-check-label" for="view-3d">3D</label>
+        </div>
+      </div>
+
+      <div class="panel mb-3">
+        <div class="text-dim mb-2" style="font-size:.78rem">Sensors</div>
+        <div class="form-check">
+          <input class="form-check-input sensor-check" type="checkbox" value="radar" id="sensor-radar" checked>
+          <label class="form-check-label badge-radar" for="sensor-radar">Radar</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input sensor-check" type="checkbox" value="lidar" id="sensor-lidar" checked>
+          <label class="form-check-label badge-lidar" for="sensor-lidar">Lidar</label>
+        </div>
+        <div class="text-dim mt-1" style="font-size:.72rem">Both checked = combined view</div>
+      </div>
+
+      <div class="panel mb-3">
+        <div class="text-dim mb-2" style="font-size:.78rem">Overlays</div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="show-annotations" checked>
+          <label class="form-check-label" for="show-annotations">Annotations</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="show-detections" disabled>
+          <label class="form-check-label text-dim" for="show-detections">
+            Object detections
+            <div style="font-size:.7rem">No model wired in yet</div>
+          </label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="text-dim mb-2" style="font-size:.78rem">Camera</div>
+        {% if camera_channels %}
+          <select id="camera-select" class="form-select form-select-sm">
+            <option value="">None</option>
+            {% for ch in camera_channels %}
+              <option value="{{ ch }}" {{ 'selected' if loop.first else '' }}>{{ ch }}</option>
+            {% endfor %}
+          </select>
+        {% else %}
+          <div class="text-dim" style="font-size:.85rem">No camera channels found.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-9">
+      <div class="panel mb-3">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <button id="play-btn" class="btn btn-accent btn-sm">Play</button>
+          <input type="range" id="frame-slider" min="0" max="0" value="0" class="form-range flex-grow-1">
+          <span id="frame-label" class="mono text-dim" style="min-width:90px">0 / 0</span>
+          <select id="speed-select" class="form-select form-select-sm" style="width:auto">
+            <option value="500">0.5x</option>
+            <option value="250" selected>1x</option>
+            <option value="125">2x</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12" id="main-view-col">
+          <div class="channel-card">
+            <div class="channel-head">
+              <span id="main-view-title">Top-down</span>
+              <span id="timestamp-label" class="text-dim mono" style="font-size:.75rem"></span>
+            </div>
+            <div id="topdown-wrap"><img id="topdown-img" alt="Top-down view"></div>
+            <div id="plot3d-wrap" style="display:none; height:480px;"></div>
+          </div>
+        </div>
+        <div class="col-12" id="camera-col" style="display:none;">
+          <div class="channel-card">
+            <div class="channel-head"><span>Camera</span></div>
+            <img id="camera-img" alt="Camera view">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<script id="scene-data" type="application/json">{{ samples_json | safe }}</script>
+<script>
+  window.SCENE_ENDPOINTS = {
+    media: "{{ url_for('dashboard.media', filename='__FILE__') }}",
+    topdown: "{{ url_for('dashboard.sample_topdown', sample_token='__TOKEN__') }}",
+    points: "{{ url_for('dashboard.sample_points', sample_token='__TOKEN__') }}",
+  };
+</script>
+<script src="{{ url_for('static', filename='js/scene_viewer.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,148 @@
+"""
+Whole-scene viewer: a top-down "video" (frame-by-frame PNG the client pages
+through) and an interactive 3D point view, both combining whichever sensors
+the user picks (radar/lidar/both) in a shared ego-vehicle frame so multiple
+sensors line up in one plot, with an optional annotation overlay.
+"""
+import io
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+from app import geometry, truckscenes_loader as tsl
+
+MODALITY_COLOR = {"radar": "#e2793d", "lidar": "#4bb4c4"}
+MAX_3D_POINTS_PER_MODALITY = 20000
+
+
+def get_detections_for_sample(sample_token):
+    """
+    Placeholder for object detection model/s
+    """
+    return []
+
+
+def _collect_points(sample_token, sensors):
+    """{modality: {"xyz": (N,3) ego-frame array, "color": (N,) array}}, added across every channel of that modality."""
+    channels = tsl.get_sample_data_by_channel(sample_token)
+    out = {}
+    for modality in sensors:
+        xyz_parts, color_parts = [], []
+        for _, entry in channels.items():
+            if entry["modality"] != modality:
+                continue
+            xyz, color = geometry.load_points_ego_frame(entry["sample_data"]["token"], modality)
+            if len(xyz) > 0:
+                xyz_parts.append(xyz)
+                color_parts.append(color)
+        if xyz_parts:
+            out[modality] = {
+                "xyz": np.concatenate(xyz_parts, axis=0),
+                "color": np.concatenate(color_parts, axis=0),
+            }
+    return out
+
+
+def _reference_sample_data(channels):
+    """One sample_data token to anchor the shared ego frame."""
+    for _, entry in channels.items():
+        if entry["modality"] == "lidar":
+            return entry["sample_data"]["token"]
+    for _, entry in channels.items():
+        if entry["modality"] == "radar":
+            return entry["sample_data"]["token"]
+    return None
+
+
+def _category_name(trucksc, ann):
+    instance = trucksc.get("instance", ann["instance_token"])
+    category = trucksc.get("category", instance["category_token"])
+    return category["name"]
+
+
+def _collect_annotation_boxes(sample_token, channels):
+    reference = _reference_sample_data(channels)
+    if reference is None:
+        return []
+
+    trucksc = tsl.get_trucksc()
+    boxes = []
+    for ann_token in tsl.get_sample_annotations(sample_token):
+        ann = trucksc.get("sample_annotation", ann_token)
+        corners = geometry.annotation_to_ego_frame(ann, reference)
+        boxes.append({"corners": corners, "category": _category_name(trucksc, ann)})
+    return boxes
+
+
+def render_topdown_png(sample_token, sensors, show_annotations, xlim=80, ylim=80):
+    channels = tsl.get_sample_data_by_channel(sample_token)
+    points = _collect_points(sample_token, sensors)
+
+    fig, ax = plt.subplots(figsize=(6.5, 6.5), dpi=110)
+
+    if "lidar" in points:
+        xyz = points["lidar"]["xyz"]
+        ax.scatter(xyz[:, 0], xyz[:, 1], s=1, c=MODALITY_COLOR["lidar"], alpha=0.5, label="lidar")
+    if "radar" in points:
+        xyz = points["radar"]["xyz"]
+        ax.scatter(xyz[:, 0], xyz[:, 1], s=5, c=MODALITY_COLOR["radar"], alpha=0.85, label="radar")
+
+    if show_annotations:
+        for box in _collect_annotation_boxes(sample_token, channels):
+            # top-face corners
+            footprint = box["corners"][[0, 1, 5, 4], :2]
+            closed = np.vstack([footprint, footprint[0]])
+            ax.plot(closed[:, 0], closed[:, 1], c="#f2e5c9", linewidth=1)
+
+    # Placeholder
+    for _det in get_detections_for_sample(sample_token):
+        pass
+
+    ax.set_xlim(-xlim, xlim)
+    ax.set_ylim(-ylim, ylim)
+    ax.set_xlabel("x (m, forward)")
+    ax.set_ylabel("y (m, left)")
+    ax.set_aspect("equal")
+    ax.grid(alpha=0.2)
+    if points:
+        ax.legend(loc="upper right", fontsize=8)
+
+    buf = io.BytesIO()
+    fig.tight_layout()
+    fig.savefig(buf, format="png")
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+
+
+def _downsample(xyz, color, cap):
+    if len(xyz) <= cap:
+        return xyz, color
+    idx = np.random.choice(len(xyz), cap, replace=False)
+    return xyz[idx], color[idx]
+
+
+def get_points_payload(sample_token, sensors, show_annotations):
+    channels = tsl.get_sample_data_by_channel(sample_token)
+    points = _collect_points(sample_token, sensors)
+
+    payload = {"modalities": {}}
+    for modality, data in points.items():
+        xyz, color = _downsample(data["xyz"], data["color"], MAX_3D_POINTS_PER_MODALITY)
+        payload["modalities"][modality] = {
+            "x": xyz[:, 0].tolist(),
+            "y": xyz[:, 1].tolist(),
+            "z": xyz[:, 2].tolist(),
+            "color": color.tolist(),
+        }
+
+    if show_annotations:
+        payload["annotations"] = [
+            {"corners": box["corners"].tolist(), "category": box["category"]}
+            for box in _collect_annotation_boxes(sample_token, channels)
+        ]
+    else:
+        payload["annotations"] = []
+
+    payload["detections"] = get_detections_for_sample(sample_token)  # always [] today
+    return payload

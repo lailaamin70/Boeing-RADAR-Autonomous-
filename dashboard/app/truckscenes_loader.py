@@ -7,14 +7,12 @@ import os
 import threading
 
 import matplotlib
-
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
 from truckscenes import TruckScenes
 from truckscenes.utils.data_classes import LidarPointCloud, RadarPointCloud
-
 from config import Config
 
 # Radar row layout
@@ -119,6 +117,18 @@ def get_sample_data_by_channel(sample_token):
         sensor = trucksc.get("sensor", calibrated["sensor_token"])
         out[channel] = {"sample_data": sd, "modality": sensor["modality"]}
     return out
+
+
+def get_sample_annotations(sample_token):
+    """
+    Sample annotation tokens for a sample.
+    """
+    trucksc = get_trucksc()
+    sample = trucksc.get("sample", sample_token)
+    anns = sample.get("anns")
+    if anns is not None:
+        return anns
+    return [a["token"] for a in trucksc.sample_annotation if a["sample_token"] == sample_token]
 
 
 def get_full_path(filename):
