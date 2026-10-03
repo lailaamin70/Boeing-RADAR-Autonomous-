@@ -204,6 +204,21 @@ def _register_radar_components(omnihd_root: Path) -> None:
             "projects.mmdet3d_plugin.rcfusion.voxel_encoders",
             voxel_encoders_path,
         )
+        utils_module = importlib.import_module(
+            "projects.mmdet3d_plugin.rcfusion.voxel_encoders.utils"
+        )
+        # The official OmniHD pillar_encoder imports legacy
+        # PFNLayer_Radar_vod, but current utils.py does not define it.
+        # PillarFeatureNetV1 does not use this symbol; provide an in-memory
+        # compatibility alias only to allow the official module to import.
+        if not hasattr(utils_module, "PFNLayer_Radar_vod"):
+            if not hasattr(utils_module, "PFNLayer_RadarV2"):
+                raise RuntimeError(
+                    "OmniHD RADAR utils contains neither PFNLayer_Radar_vod nor "
+                    "PFNLayer_RadarV2"
+                )
+            utils_module.PFNLayer_Radar_vod = utils_module.PFNLayer_RadarV2
+
         encoder_path = voxel_encoders_path / "pillar_encoder.py"
         try:
             _load_source_module(
