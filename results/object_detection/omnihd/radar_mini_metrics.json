@@ -1,0 +1,119 @@
+{
+  "experiment": {
+    "model": "OmniHD-pretrained PointPillars",
+    "source_training_dataset": "OmniHD",
+    "evaluation_dataset": "TruckScenes",
+    "prediction_modality": "radar",
+    "interpretation": "OmniHD-pretrained PointPillars transferred to TruckScenes"
+  },
+  "inputs": {
+    "omnihd_root": "E:\\OmniHD-Scenes",
+    "ann_file": "E:\\TruckScenes_OmniHD_mini\\truckscenes_omnihd_infos_eval.pkl",
+    "predictions": "E:\\Boeing-RADAR-Autonomous-\\results\\object_detection\\omnihd\\radar_mini_predictions.pkl"
+  },
+  "protocol": {
+    "name": "OmniHD/NewScenes adapted center-distance AP",
+    "config": "detection_newsc_config_final",
+    "classes": [
+      "car",
+      "pedestrian",
+      "rider",
+      "large_vehicle"
+    ],
+    "distance_thresholds_m": [
+      1.0,
+      2.0,
+      3.0,
+      4.0
+    ],
+    "min_recall": 0.1,
+    "min_precision": 0.1,
+    "class_range": {
+      "car": [
+        60.0,
+        40.0
+      ],
+      "pedestrian": [
+        60.0,
+        40.0
+      ],
+      "rider": [
+        60.0,
+        40.0
+      ],
+      "large_vehicle": [
+        60.0,
+        40.0
+      ]
+    },
+    "max_boxes_per_sample": 500,
+    "matching": "XY center distance with strict distance < threshold",
+    "visibility_policy": "No native OmniHD camera-visibility filtering. TruckScenes valid_flag represents adapter-retained mapped annotations only.",
+    "reported_metrics": "AP and mAP only",
+    "neutral_box_fields": "Size, rotation, velocity, and point count are neutral placeholders required by DetectionBox and are not reported as TP metrics."
+  },
+  "dataset": {
+    "samples": 400,
+    "gt_boxes_before_range_filter": 17488,
+    "gt_boxes_after_range_filter": 7723,
+    "predictions_before_range_filter": 66363,
+    "predictions_after_range_filter": 66343,
+    "gt_boxes_by_class_before_range_filter": {
+      "car": 11811,
+      "pedestrian": 1254,
+      "rider": 214,
+      "large_vehicle": 4209
+    },
+    "gt_boxes_by_class_after_range_filter": {
+      "car": 4508,
+      "pedestrian": 994,
+      "rider": 142,
+      "large_vehicle": 2079
+    },
+    "predictions_by_class_before_range_filter": {
+      "car": 48110,
+      "pedestrian": 6611,
+      "rider": 5338,
+      "large_vehicle": 6304
+    },
+    "predictions_by_class_after_range_filter": {
+      "car": 48099,
+      "pedestrian": 6611,
+      "rider": 5338,
+      "large_vehicle": 6295
+    }
+  },
+  "ap_by_class_and_threshold": {
+    "car": {
+      "1.0": 0.0,
+      "2.0": 0.0,
+      "3.0": 0.00297181655494043,
+      "4.0": 0.009297425757966797
+    },
+    "pedestrian": {
+      "1.0": 0.0,
+      "2.0": 0.0,
+      "3.0": 0.0,
+      "4.0": 0.0
+    },
+    "rider": {
+      "1.0": 0.0,
+      "2.0": 0.0,
+      "3.0": 0.0,
+      "4.0": 0.0
+    },
+    "large_vehicle": {
+      "1.0": 0.0,
+      "2.0": 0.0,
+      "3.0": 0.0,
+      "4.0": 0.0019140720130185317
+    }
+  },
+  "class_ap": {
+    "car": 0.003067310578226807,
+    "pedestrian": 0.0,
+    "rider": 0.0,
+    "large_vehicle": 0.00047851800325463293
+  },
+  "mAP": 0.00088645714537036
+}
