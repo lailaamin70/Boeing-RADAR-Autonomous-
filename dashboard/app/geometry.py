@@ -2,7 +2,6 @@
 Coordinate transforms shared by the scene viewer: moving sensor points and
 annotation boxes between frames.
 
-Frame chain for a single sample_data record):
     sensor frame --(calibrated_sensor translation/rotation)--> ego frame
     ego frame    --(ego_pose translation/rotation)-->          global frame
 
@@ -42,6 +41,14 @@ def box_corners(center, size, quat_wxyz):
     corners = np.vstack([x_corners, y_corners, z_corners]).T  # (8, 3)
     corners = quat_rotate(quat_wxyz, corners)
     return corners + np.array(center)
+
+
+def yaw_to_quaternion(yaw):
+    """
+    [w, x, y, z] quaternion for a rotation of `yaw` radians about the z
+    axis.
+    """
+    return [np.cos(yaw / 2), 0.0, 0.0, np.sin(yaw / 2)]
 
 
 def points_sensor_to_ego(points_xyz, calibrated_sensor):

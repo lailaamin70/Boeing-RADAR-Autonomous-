@@ -12,14 +12,29 @@ import numpy as np
 from app import geometry, truckscenes_loader as tsl
 
 MODALITY_COLOR = {"radar": "#e2793d", "lidar": "#4bb4c4"}
+ANNOTATION_COLOR = "#f2e5c9"
 MAX_3D_POINTS_PER_MODALITY = 20000
 
 
-def get_detections_for_sample(sample_token):
+def get_detections_for_sample(sample_token, modalities, score_threshold=None):
     """
-    Placeholder for object detection model/s
+    OmniHD-PointPillars detections for whichever modalities are selected,
+    converted to the same ego-frame corner format as _collect_annotation_boxes.
     """
-    return []
+    boxes = []
+    for modality in modalities:
+        for pred in detections_loader.get_predictions(modality, sample_token, score_threshold):
+            quat = geometry.yaw_to_quaternion(pred["yaw"])
+            corners = geometry.box_corners(pred["center"], pred["size"], quat)
+            boxes.append(
+                {
+                    "corners": corners,
+                    "category": pred["label"],
+                    "score": pred["score"],
+                    "modality": modality,
+                }
+            )
+    return boxes
 
 
 def _collect_points(sample_token, sensors):
@@ -44,7 +59,7 @@ def _collect_points(sample_token, sensors):
 
 
 def _reference_sample_data(channels):
-    """One sample_data token to anchor the shared ego frame."""
+    """One sample_data token to anchor the shared ego frame - prefer lidar, else radar."""
     for _, entry in channels.items():
         if entry["modality"] == "lidar":
             return entry["sample_data"]["token"]
@@ -74,7 +89,9 @@ def _collect_annotation_boxes(sample_token, channels):
     return boxes
 
 
-def render_topdown_png(sample_token, sensors, show_annotations, xlim=80, ylim=80):
+def render_topdown_png(
+    sample_token, sensors, show_annotations, show_detections=False, min_score=None, xlim=80, ylim=80
+):
     channels = tsl.get_sample_data_by_channel(sample_token)
     points = _collect_points(sample_token, sensors)
 
@@ -92,11 +109,25 @@ def render_topdown_png(sample_token, sensors, show_annotations, xlim=80, ylim=80
             # top-face corners
             footprint = box["corners"][[0, 1, 5, 4], :2]
             closed = np.vstack([footprint, footprint[0]])
-            ax.plot(closed[:, 0], closed[:, 1], c="#f2e5c9", linewidth=1)
+            ax.plot(closed[:, 0], closed[:, 1], c=ANNOTATION_COLOR, linewidth=1)
 
-    # Placeholder
-    for _det in get_detections_for_sample(sample_token):
-        pass
+    if show_detections:
+        labeled_modalities = set()
+        for det in get_detections_for_sample(sample_token, sensors, min_score):
+            footprint = det["corners"][[0, 1, 5, 4], :2]
+            closed = np.vstack([footprint, footprint[0]])
+            label = None
+            if det["modality"] not in labeled_modalities:
+                label = f'{det["modality"]} detections'
+                labeled_modalities.add(det["modality"])
+            ax.plot(
+                closed[:, 0],
+                closed[:, 1],
+                c=MODALITY_COLOR.get(det["modality"], "#ffffff"),
+                linewidth=1.3,
+                linestyle="--",
+                label=label,
+            )
 
     ax.set_xlim(-xlim, xlim)
     ax.set_ylim(-ylim, ylim)
@@ -122,7 +153,7 @@ def _downsample(xyz, color, cap):
     return xyz[idx], color[idx]
 
 
-def get_points_payload(sample_token, sensors, show_annotations):
+def get_points_payload(sample_token, sensors, show_annotations, show_detections=False, min_score=None):
     channels = tsl.get_sample_data_by_channel(sample_token)
     points = _collect_points(sample_token, sensors)
 
@@ -144,5 +175,17 @@ def get_points_payload(sample_token, sensors, show_annotations):
     else:
         payload["annotations"] = []
 
-    payload["detections"] = get_detections_for_sample(sample_token)  # always [] today
+    if show_detections:
+        payload["detections"] = [
+            {
+                "corners": det["corners"].tolist(),
+                "category": det["category"],
+                "score": det["score"],
+                "modality": det["modality"],
+            }
+            for det in get_detections_for_sample(sample_token, sensors, min_score)
+        ]
+    else:
+        payload["detections"] = []
+
     return payload

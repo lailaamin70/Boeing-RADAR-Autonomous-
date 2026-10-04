@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -28,3 +29,13 @@ class Config:
         "ANALYSIS_CACHE_PATH",
         os.path.join(BASE_DIR, "instance", "analysis_expensive_cache.json"),
     )
+
+    # Object detection results:
+    _DEFAULT_OMNIHD_DIR = os.path.normpath(
+        os.path.join(BASE_DIR, "..", "results", "object_detection", "omnihd")
+    )
+    OMNIHD_RESULTS_DIR = os.environ.get("OMNIHD_RESULTS_DIR", _DEFAULT_OMNIHD_DIR)
+    DETECTIONS_PATHS = {
+        "lidar": Path(OMNIHD_RESULTS_DIR) / "lidar_mini_predictions.pkl",
+        "radar": Path(OMNIHD_RESULTS_DIR) / "radar_mini_predictions.pkl",
+    }
