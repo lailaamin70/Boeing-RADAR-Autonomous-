@@ -178,14 +178,22 @@ function stepFrame(delta) {
 
 function startPlayback() {
   if (samples.length <= 1) return;
+
+  if (frameIndex >= samples.length - 1) {
+    frameIndex = 0;
+    updateFrame();
+  }
+
   playing = true;
   els.playBtn.textContent = "Pause";
+
   const tick = () => {
     if (!playing) return;
     if (frameIndex >= samples.length - 1) {
       stopPlayback();
       return;
     }
+
     stepFrame(1);
     playTimer = setTimeout(tick, Number(els.speed.value));
   };
