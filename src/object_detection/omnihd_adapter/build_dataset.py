@@ -78,6 +78,7 @@ class BuildConfig:
     sample_tokens: tuple[str, ...] | None = None
     scene_tokens: tuple[str, ...] | None = None
     build_all_samples: bool = False
+    filter_missing_sensor_files: bool = True
     metadata_path_prefix: str | Path | None = None
     info_filename: str = "truckscenes_omnihd_infos.pkl"
     manifest_filename: str = "build_manifest.json"
@@ -175,6 +176,8 @@ def _validate_config(config: BuildConfig) -> None:
         )
     if not isinstance(config.build_all_samples, bool):
         raise ValueError("build_all_samples must be a bool")
+    if not isinstance(config.filter_missing_sensor_files, bool):
+        raise ValueError("filter_missing_sensor_files must be a bool")
 
     for filename, name, suffixes in (
         (config.info_filename, "info_filename", (".pkl", ".pickle")),
@@ -378,7 +381,7 @@ def resolve_ego_velocity(
     return velocity
 
 
-def _source_data_path(data_root: str | Path, filename: object) -> Path:
+def _resolve_source_data_path(data_root: str | Path, filename: object) -> Path:
     relative = Path(_require_non_empty_string(filename, "sample_data filename"))
     if relative.is_absolute():
         raise ValueError(f"sample_data filename must be relative: {relative}")
@@ -386,6 +389,11 @@ def _source_data_path(data_root: str | Path, filename: object) -> Path:
     path = (root / relative).resolve()
     if path != root and root not in path.parents:
         raise ValueError(f"sample_data filename escapes data_root: {relative}")
+    return path
+
+
+def _source_data_path(data_root: str | Path, filename: object) -> Path:
+    path = _resolve_source_data_path(data_root, filename)
     if not path.is_file():
         raise FileNotFoundError(f"TruckScenes sensor file not found: {path}")
     return path
@@ -627,6 +635,118 @@ def _select_samples(config: BuildConfig, indexes: Mapping[str, Any]) -> list[Map
     )
 
 
+def _required_sensor_records(
+    sample: Mapping, config: BuildConfig, indexes: Mapping[str, Any]
+) -> list[Mapping]:
+    """Return every LiDAR/RADAR file record consumed for one output sample."""
+    records = [
+        _current_sample_data(sample, channel, indexes)
+        for channel in config.lidar_channels
+    ]
+    sample_data_by_token = indexes["sample_data_by_token"]
+    for channel in config.radar_channels:
+        current = _current_sample_data(sample, channel, indexes)
+        records.extend(
+            collect_radar_sweep_records(
+                current, sample_data_by_token, config.radar_sweeps_num
+            )
+        )
+    return records
+
+
+def _filter_samples_by_local_sensor_files(
+    samples: Sequence[Mapping], config: BuildConfig, indexes: Mapping[str, Any]
+) -> tuple[list[Mapping], dict[str, Any]]:
+    """Keep only samples whose complete configured sensor inputs are local."""
+    if not config.filter_missing_sensor_files:
+        summary = {
+            "enabled": False,
+            "metadata_scenes": len(indexes["scene_by_token"]),
+            "metadata_samples": len(indexes["sample_by_token"]),
+            "selected_samples": len(samples),
+            "skipped_missing_sensor_files": 0,
+            "usable_samples": len(samples),
+            "usable_scenes": len({sample["scene_token"] for sample in samples}),
+            "missing_file_references": 0,
+            "unique_missing_files": 0,
+            "missing_file_examples": [],
+        }
+        return list(samples), summary
+
+    availability_cache: dict[str, bool] = {}
+    usable_samples = []
+    usable_scene_tokens = set()
+    unique_missing_files = set()
+    missing_file_examples = []
+    missing_file_references = 0
+
+    for sample in samples:
+        sample_has_missing_file = False
+        checked_tokens = set()
+        for record in _required_sensor_records(sample, config, indexes):
+            record_token = _require_non_empty_string(
+                record.get("token"), "sample_data token"
+            )
+            if record_token in checked_tokens:
+                continue
+            checked_tokens.add(record_token)
+
+            filename = _require_non_empty_string(
+                record.get("filename"), "sample_data filename"
+            )
+            if filename not in availability_cache:
+                path = _resolve_source_data_path(config.data_root, filename)
+                availability_cache[filename] = path.is_file()
+            if availability_cache[filename]:
+                continue
+
+            sample_has_missing_file = True
+            missing_file_references += 1
+            if filename not in unique_missing_files:
+                unique_missing_files.add(filename)
+                if len(missing_file_examples) < 5:
+                    missing_file_examples.append(filename)
+
+        if not sample_has_missing_file:
+            usable_samples.append(sample)
+            usable_scene_tokens.add(sample["scene_token"])
+
+    summary = {
+        "enabled": True,
+        "metadata_scenes": len(indexes["scene_by_token"]),
+        "metadata_samples": len(indexes["sample_by_token"]),
+        "selected_samples": len(samples),
+        "skipped_missing_sensor_files": len(samples) - len(usable_samples),
+        "usable_samples": len(usable_samples),
+        "usable_scenes": len(usable_scene_tokens),
+        "missing_file_references": missing_file_references,
+        "unique_missing_files": len(unique_missing_files),
+        "missing_file_examples": missing_file_examples,
+    }
+    return usable_samples, summary
+
+
+def _print_availability_summary(summary: Mapping[str, Any]) -> None:
+    """Print the trainval metadata and local sensor-file selection counts."""
+    print("TruckScenes metadata and local-file availability")
+    print("------------------------------------------------")
+    print("Metadata scenes: {}".format(summary["metadata_scenes"]))
+    print("Metadata samples: {}".format(summary["metadata_samples"]))
+    print("Samples requested: {}".format(summary["selected_samples"]))
+    print(
+        "Samples skipped for missing required sensor files: {}".format(
+            summary["skipped_missing_sensor_files"]
+        )
+    )
+    print("Usable local samples selected: {}".format(summary["usable_samples"]))
+    print("Usable scenes represented: {}".format(summary["usable_scenes"]))
+    if summary["missing_file_examples"]:
+        print("Missing sensor-file examples:")
+        for filename in summary["missing_file_examples"]:
+            print("  {}".format(filename))
+    print(flush=True)
+
+
 def _selection_manifest(config: BuildConfig) -> dict[str, Any]:
     if config.sample_tokens is not None:
         return {"mode": "sample_tokens", "requested_count": len(config.sample_tokens)}
@@ -646,6 +766,15 @@ def build_dataset(config: BuildConfig) -> dict[str, Any]:
     tables = load_truckscenes_tables(config.data_root, config.metadata_version)
     indexes = build_table_indexes(tables)
     selected_samples = _select_samples(config, indexes)
+    selected_samples, availability = _filter_samples_by_local_sensor_files(
+        selected_samples, config, indexes
+    )
+    _print_availability_summary(availability)
+    if not selected_samples:
+        raise ValueError(
+            "No selected TruckScenes samples have all required local LiDAR and "
+            "RADAR files"
+        )
 
     output_root = Path(config.output_root)
     output_root.mkdir(parents=True, exist_ok=True)
@@ -690,6 +819,7 @@ def build_dataset(config: BuildConfig) -> dict[str, Any]:
         "radar_snr_fill_value": float(config.radar_snr_fill_value),
         "radar_power_fill_value": config.radar_power_fill_value,
         "ego_velocity_source": config.ego_velocity_source,
+        "source_availability": availability,
         "with_velocity": False,
     }
     payload = {"infos": infos, "metadata": metadata}
@@ -722,6 +852,7 @@ def build_dataset(config: BuildConfig) -> dict[str, Any]:
             else str(config.metadata_path_prefix).replace("\\", "/")
         ),
         "selection": _selection_manifest(config),
+        "source_availability": availability,
         "reference_channel": config.reference_channel,
         "lidar_channels": list(config.lidar_channels),
         "radar_channels": list(config.radar_channels),
@@ -753,4 +884,5 @@ def build_dataset(config: BuildConfig) -> dict[str, Any]:
         "info_path": info_path,
         "manifest_path": manifest_path,
         "counts": totals,
+        "availability": availability,
     }

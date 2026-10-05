@@ -16,11 +16,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # Dataset configuration
 DATA_ROOT = PROJECT_ROOT / "data" / "man-truckscenes"
 
-VERSION = "v1.2-mini"
+VERSION = "v1.2-trainval"
 
 
 # Derived dataset paths
-SENSOR_ROOT = DATA_ROOT / "man-truckscenes"
+SENSOR_ROOT = DATA_ROOT
 
 SAMPLES_ROOT = SENSOR_ROOT / "samples"
 
