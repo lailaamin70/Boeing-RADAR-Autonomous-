@@ -348,6 +348,75 @@ def build_radar_radial_df(
 
     return pd.concat(radial_tables, ignore_index=True)
 
+def build_radar_radial_validation_df(radar_radial_df, vehicle_reference_df):
+    """Validate RADAR radial velocity against projected reference velocity."""
+
+    radial_required = {
+        "annotation_token",
+        "sensor",
+        "radar_radial_velocity_mps",
+        "los_global_x",
+        "los_global_y",
+    }
+    reference_required = {
+        "start_annotation_token",
+        "end_annotation_token",
+        "instance_token",
+        "category",
+        "vx_mps",
+        "vy_mps",
+    }
+
+    _require_columns(radar_radial_df, radial_required, "radar_radial_df")
+    _require_columns(vehicle_reference_df, reference_required, "vehicle_reference_df")
+
+    radial_by_annotation = {
+        token: group
+        for token, group in radar_radial_df.groupby("annotation_token")
+    }
+
+    validation_tables = []
+
+    for _, interval in vehicle_reference_df.iterrows():
+        points = radial_by_annotation.get(interval["start_annotation_token"])
+
+        if points is None or points.empty:
+            continue
+
+        data = points[
+            [
+                "annotation_token",
+                "sensor",
+                "radar_radial_velocity_mps",
+                "los_global_x",
+                "los_global_y",
+            ]
+        ].copy()
+
+        data["reference_radial_velocity_mps"] = (
+            interval["vx_mps"] * data["los_global_x"]
+            + interval["vy_mps"] * data["los_global_y"]
+        )
+
+        data["radial_residual_mps"] = (
+            data["radar_radial_velocity_mps"]
+            - data["reference_radial_velocity_mps"]
+        )
+
+        data["radial_abs_error_mps"] = data["radial_residual_mps"].abs()
+
+        data["start_annotation_token"] = interval["start_annotation_token"]
+        data["end_annotation_token"] = interval["end_annotation_token"]
+        data["instance_token"] = interval["instance_token"]
+        data["category"] = interval["category"]
+
+        validation_tables.append(data)
+
+    if not validation_tables:
+        return pd.DataFrame()
+
+    return pd.concat(validation_tables, ignore_index=True)
+
 def _huber_irls(U, b, max_iter=20, tol=1e-6):
     """Estimate a velocity vector using Huber iteratively reweighted least squares."""
     velocity, _, _, _ = np.linalg.lstsq(U, b, rcond=None)
