@@ -176,13 +176,30 @@ def _parse_sensors(args):
     return sensors or list(VALID_SENSORS)
 
 
+def _parse_min_score(args):
+    """
+    None means "use detections_loader's default"
+    """
+    raw = args.get("min_score")
+    if raw is None or raw == "":
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
 @bp.route("/sample/<sample_token>/topdown.png")
 def sample_topdown(sample_token):
     """Radar/Lidar top-down PNG for one frame."""
     sensors = _parse_sensors(request.args)
     show_annotations = request.args.get("annotations") == "1"
+    show_detections = request.args.get("detections") == "1"
+    min_score = _parse_min_score(request.args)
     try:
-        buf = scene_viewer.render_topdown_png(sample_token, sensors, show_annotations)
+        buf = scene_viewer.render_topdown_png(
+            sample_token, sensors, show_annotations, show_detections, min_score
+        )
     except KeyError:
         abort(404)
     return send_file(buf, mimetype="image/png")
@@ -193,8 +210,12 @@ def sample_points(sample_token):
     """Radar/Lidar points and annotation boxes for the 3D view."""
     sensors = _parse_sensors(request.args)
     show_annotations = request.args.get("annotations") == "1"
+    show_detections = request.args.get("detections") == "1"
+    min_score = _parse_min_score(request.args)
     try:
-        data = scene_viewer.get_points_payload(sample_token, sensors, show_annotations)
+        data = scene_viewer.get_points_payload(
+            sample_token, sensors, show_annotations, show_detections, min_score
+        )
     except KeyError:
         abort(404)
     return jsonify(data)

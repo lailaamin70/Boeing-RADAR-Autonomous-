@@ -44,11 +44,21 @@
           <input class="form-check-input" type="checkbox" id="show-annotations" checked>
           <label class="form-check-label" for="show-annotations">Annotations</label>
         </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="show-detections" disabled>
-          <label class="form-check-label text-dim" for="show-detections">
-            Object detection
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="show-detections">
+          <label class="form-check-label" for="show-detections">
+            Object detections
+            <div class="text-dim" style="font-size:.7rem">OmniHD-PointPillars &middot; dashed outline, colored by source sensor</div>
           </label>
+        </div>
+        <div id="score-threshold-wrap" style="display:none">
+          <label for="score-threshold" class="text-dim" style="font-size:.72rem">
+            Min score: <span id="score-threshold-label" class="mono">default</span>
+          </label>
+          <input type="range" id="score-threshold" class="form-range" min="0" max="1" step="0.05" value="">
+          <div class="text-dim" style="font-size:.68rem">
+            Radar detections are mostly noise (mAP &asymp; 0.001) &mdash; raise this to clean them up
+          </div>
         </div>
       </div>
 

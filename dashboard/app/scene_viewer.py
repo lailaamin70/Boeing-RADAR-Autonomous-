@@ -9,10 +9,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from app import geometry, truckscenes_loader as tsl
+from app import geometry, truckscenes_loader as tsl, detections_loader
 
 MODALITY_COLOR = {"radar": "#e2793d", "lidar": "#4bb4c4"}
 ANNOTATION_COLOR = "#f2e5c9"
+DETECTION_COLOR = {"radar": "#ff4d8d", "lidar": "#c6ff4d"}
 MAX_3D_POINTS_PER_MODALITY = 20000
 
 
@@ -123,7 +124,7 @@ def render_topdown_png(
             ax.plot(
                 closed[:, 0],
                 closed[:, 1],
-                c=MODALITY_COLOR.get(det["modality"], "#ffffff"),
+                c=DETECTION_COLOR.get(det["modality"], "#ffffff"),
                 linewidth=1.3,
                 linestyle="--",
                 label=label,
