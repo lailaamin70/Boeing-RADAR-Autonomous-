@@ -1,0 +1,4 @@
+results/condition/available_sample_data.csv filter=lfs diff=lfs merge=lfs -text
+results/condition/radar_radial_df.csv filter=lfs diff=lfs merge=lfs -text
+results/condition/radar_validation_df.csv filter=lfs diff=lfs merge=lfs -text
+results/condition/vehicle_reference_df.csv filter=lfs diff=lfs merge=lfs -text

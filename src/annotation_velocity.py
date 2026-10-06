@@ -361,3 +361,24 @@ def add_reference_velocity(annotation_pairs):
     ) ** 0.5
 
     return result
+
+
+def build_vehicle_reference_df(samples, annotations, instances, categories):
+    """Build the complete vehicle reference-velocity table."""
+
+    df = build_annotation_trajectory_df(
+        samples,
+        annotations,
+        instances,
+        categories,
+    )
+
+    df = build_annotation_pairs(df)
+    df = add_time_differences(df)
+    df = add_position_changes(df)
+    df = add_reference_velocity(df)
+
+    return df[
+        df["category"].str.startswith("vehicle.")
+        & (df["category"] != "vehicle.ego_trailer")
+    ].copy()

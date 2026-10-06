@@ -1,7 +1,5 @@
 """
 Reusable RADAR velocity utilities for the TruckScenes project.
-
-Validated in 03_radar.ipynb.
 """
 
 from pathlib import Path
@@ -87,16 +85,16 @@ def get_radar_points_in_annotation(
 
 def build_target_radar_points_df(
     radar_observation_df,
-    metadata_root=None,
+    annotations,
+    instances,
+    categories,
+    sample_data_lookup,
+    ego_pose_lookup,
+    calibrated_sensor_lookup,
     sensor_root=None,
 ):
-    """
-    Associate keyframe RADAR returns with annotated target vehicles.
+    """Associate keyframe RADAR returns with annotated target vehicles."""
 
-    Each output row represents one target-associated RADAR return.
-    Intermediate sweeps are not supported by this validated workflow.
-    """
-    metadata_root = Path(METADATA_ROOT if metadata_root is None else metadata_root)
     sensor_root = Path(SENSOR_ROOT if sensor_root is None else sensor_root)
 
     required = {"Token", "Sample Token", "Sensor", "Timestamp", "Is Key Frame"}
@@ -107,12 +105,13 @@ def build_target_radar_points_df(
             "build_target_radar_points_df currently supports keyframe RADAR observations only."
         )
 
-    annotations = load_json(metadata_root / "sample_annotation.json")
-    instances = load_json(metadata_root / "instance.json")
-    categories = load_json(metadata_root / "category.json")
-    sample_data = load_json(metadata_root / "sample_data.json")
-    ego_poses = load_json(metadata_root / "ego_pose.json")
-    calibrated_sensors = load_json(metadata_root / "calibrated_sensor.json")
+    missing_tokens = set(radar_observation_df["Token"]) - set(sample_data_lookup)
+
+    if missing_tokens:
+        raise ValueError(
+            f"{len(missing_tokens)} RADAR observations could not be matched "
+            "to sample_data metadata."
+        )
 
     annotations_by_sample = {}
     for annotation in annotations:
@@ -120,11 +119,6 @@ def build_target_radar_points_df(
 
     instance_lookup = {record["token"]: record for record in instances}
     category_lookup = {record["token"]: record["name"] for record in categories}
-    sample_data_lookup = {record["token"]: record for record in sample_data}
-    ego_pose_lookup = {record["token"]: record for record in ego_poses}
-    calibrated_sensor_lookup = {
-        record["token"]: record for record in calibrated_sensors
-    }
 
     point_tables = []
 
@@ -134,6 +128,7 @@ def build_target_radar_points_df(
         for annotation in annotations_by_sample.get(sample_token, []):
             instance = instance_lookup[annotation["instance_token"]]
             category = category_lookup[instance["category_token"]]
+
             if category.startswith("vehicle.") and category != "vehicle.ego_trailer":
                 target_annotations.append((annotation, category))
 
@@ -143,6 +138,7 @@ def build_target_radar_points_df(
             calibrated_sensor = calibrated_sensor_lookup[
                 sample_data_record["calibrated_sensor_token"]
             ]
+
             radar_points = load_radar_points(
                 sensor_root / sample_data_record["filename"]
             )
@@ -154,6 +150,7 @@ def build_target_radar_points_df(
                     ego_pose,
                     calibrated_sensor,
                 )
+
                 if target_points.empty:
                     continue
 
@@ -164,17 +161,18 @@ def build_target_radar_points_df(
                 target_points["radar_sample_data_token"] = radar_frame["Token"]
                 target_points["sensor"] = radar_frame["Sensor"]
                 target_points["radar_timestamp_us"] = radar_frame["Timestamp"]
+
                 point_tables.append(target_points)
 
-    return pd.concat(point_tables, ignore_index=True) if point_tables else pd.DataFrame()
+    if not point_tables:
+        return pd.DataFrame()
+
+    return pd.concat(point_tables, ignore_index=True)
 
 
 def build_target_radar_velocity_df(target_radar_points_df):
-    """
-    Build keyframe target-level summaries of original RADAR relative velocity.
+    """Build target-level summaries of original RADAR relative velocity."""
 
-    This does not reconstruct absolute target velocity.
-    """
     required = {
         "annotation_token",
         "instance_token",
@@ -187,34 +185,32 @@ def build_target_radar_velocity_df(target_radar_points_df):
     }
     _require_columns(target_radar_points_df, required, "target_radar_points_df")
 
-    data = target_radar_points_df.copy()
+    data = target_radar_points_df[list(required)].copy()
+
     data["vrel_magnitude"] = np.sqrt(
         data["vrel_x"] ** 2 + data["vrel_y"] ** 2 + data["vrel_z"] ** 2
     )
 
-    return (
-        data.groupby(
-            ["annotation_token", "instance_token", "sample_token", "category"],
-            as_index=False,
-        )
-        .agg(
-            radar_return_count=("vrel_magnitude", "size"),
-            radar_sensor_count=("sensor", "nunique"),
-            median_vrel_magnitude=("vrel_magnitude", "median"),
-            mean_vrel_magnitude=("vrel_magnitude", "mean"),
-            std_vrel_magnitude=("vrel_magnitude", "std"),
-        )
+    return data.groupby(
+        ["annotation_token", "instance_token", "sample_token", "category"],
+        as_index=False,
+    ).agg(
+        radar_return_count=("vrel_magnitude", "size"),
+        radar_sensor_count=("sensor", "nunique"),
+        median_vrel_magnitude=("vrel_magnitude", "median"),
+        mean_vrel_magnitude=("vrel_magnitude", "mean"),
+        std_vrel_magnitude=("vrel_magnitude", "std"),
     )
 
 
-def build_radar_radial_df(target_radar_points_df, metadata_root=None):
-    """
-    Build ego-compensated point-level RADAR radial-velocity constraints.
-
-    The validated baseline uses linear velocity from `ego_motion_cabin`.
-    Each output row remains one target-associated RADAR return.
-    """
-    metadata_root = Path(METADATA_ROOT if metadata_root is None else metadata_root)
+def build_radar_radial_df(
+    target_radar_points_df,
+    sample_data_lookup,
+    ego_pose_lookup,
+    calibrated_sensor_lookup,
+    ego_motion_cabin,
+):
+    """Build ego-compensated point-level RADAR radial-velocity constraints."""
 
     required = {
         "annotation_token",
@@ -230,22 +226,21 @@ def build_radar_radial_df(target_radar_points_df, metadata_root=None):
     }
     _require_columns(target_radar_points_df, required, "target_radar_points_df")
 
-    sample_data = load_json(metadata_root / "sample_data.json")
-    ego_poses = load_json(metadata_root / "ego_pose.json")
-    calibrated_sensors = load_json(metadata_root / "calibrated_sensor.json")
-    ego_motion_cabin = load_json(metadata_root / "ego_motion_cabin.json")
+    radar_tokens = set(target_radar_points_df["radar_sample_data_token"])
+    missing_sample_data = radar_tokens - set(sample_data_lookup)
 
-    sample_data_lookup = {record["token"]: record for record in sample_data}
-    ego_pose_lookup = {record["token"]: record for record in ego_poses}
-    calibrated_sensor_lookup = {
-        record["token"]: record for record in calibrated_sensors
-    }
+    if missing_sample_data:
+        raise ValueError(
+            f"{len(missing_sample_data)} RADAR records could not be matched "
+            "to sample_data metadata."
+        )
 
     motion_df = (
         pd.DataFrame(ego_motion_cabin)
         .sort_values("timestamp")
         .rename(columns={"timestamp": "cabin_timestamp_us"})
     )
+
     _require_columns(
         motion_df,
         {"cabin_timestamp_us", "vx", "vy", "vz"},
@@ -259,6 +254,7 @@ def build_radar_radial_df(target_radar_points_df, metadata_root=None):
         .drop_duplicates()
         .sort_values("radar_timestamp_us")
     )
+
     radar_observations = pd.merge_asof(
         radar_observations,
         motion_df,
@@ -272,20 +268,35 @@ def build_radar_radial_df(target_radar_points_df, metadata_root=None):
             "Unable to match all RADAR observations with ego_motion_cabin records."
         )
 
-    motion_lookup = (
-        radar_observations.set_index("radar_sample_data_token").to_dict("index")
-    )
+    motion_lookup = radar_observations.set_index(
+        "radar_sample_data_token"
+    ).to_dict("index")
+
     radial_tables = []
 
     for sample_data_token, group in target_radar_points_df.groupby(
         "radar_sample_data_token"
     ):
         sample_data_record = sample_data_lookup[sample_data_token]
-        calibrated_sensor = calibrated_sensor_lookup[
-            sample_data_record["calibrated_sensor_token"]
-        ]
-        ego_pose = ego_pose_lookup[sample_data_record["ego_pose_token"]]
+
+        ego_pose_token = sample_data_record["ego_pose_token"]
+        calibrated_sensor_token = sample_data_record["calibrated_sensor_token"]
+
+        if ego_pose_token not in ego_pose_lookup:
+            raise ValueError(
+                f"Ego pose not found for RADAR sample_data token: {sample_data_token}"
+            )
+
+        if calibrated_sensor_token not in calibrated_sensor_lookup:
+            raise ValueError(
+                f"Calibrated sensor not found for RADAR sample_data token: "
+                f"{sample_data_token}"
+            )
+
+        ego_pose = ego_pose_lookup[ego_pose_token]
+        calibrated_sensor = calibrated_sensor_lookup[calibrated_sensor_token]
         motion = motion_lookup[sample_data_token]
+
         group = group.copy()
 
         position_sensor = group[["x", "y", "z"]].to_numpy()
@@ -296,6 +307,7 @@ def build_radar_radial_df(target_radar_points_df, metadata_root=None):
             group = group.loc[valid].copy()
             position_sensor = position_sensor[valid]
             position_norm = position_norm[valid]
+
         if group.empty:
             continue
 
@@ -303,13 +315,23 @@ def build_radar_radial_df(target_radar_points_df, metadata_root=None):
         vrel_sensor = group[["vrel_x", "vrel_y", "vrel_z"]].to_numpy()
         relative_radial = np.sum(vrel_sensor * los_sensor, axis=1)
 
-        sensor_to_ego = Quaternion(calibrated_sensor["rotation"]).rotation_matrix
+        sensor_to_ego = Quaternion(
+            calibrated_sensor["rotation"]
+        ).rotation_matrix
         los_ego = los_sensor @ sensor_to_ego.T
-        cabin_velocity_ego = np.array([motion["vx"], motion["vy"], motion["vz"]])
+
+        cabin_velocity_ego = np.array([
+            motion["vx"],
+            motion["vy"],
+            motion["vz"],
+        ])
+
         ego_radial = los_ego @ cabin_velocity_ego
         radar_radial = relative_radial + ego_radial
 
-        ego_to_global = Quaternion(ego_pose["rotation"]).rotation_matrix
+        ego_to_global = Quaternion(
+            ego_pose["rotation"]
+        ).rotation_matrix
         los_global = los_ego @ ego_to_global.T
 
         group["relative_radial_velocity_mps"] = relative_radial
@@ -318,10 +340,82 @@ def build_radar_radial_df(target_radar_points_df, metadata_root=None):
         group["los_global_x"] = los_global[:, 0]
         group["los_global_y"] = los_global[:, 1]
         group["los_global_z"] = los_global[:, 2]
+
         radial_tables.append(group)
 
-    return pd.concat(radial_tables, ignore_index=True) if radial_tables else pd.DataFrame()
+    if not radial_tables:
+        return pd.DataFrame()
 
+    return pd.concat(radial_tables, ignore_index=True)
+
+def build_radar_radial_validation_df(radar_radial_df, vehicle_reference_df):
+    """Validate RADAR radial velocity against projected reference velocity."""
+
+    radial_required = {
+        "annotation_token",
+        "sensor",
+        "radar_radial_velocity_mps",
+        "los_global_x",
+        "los_global_y",
+    }
+    reference_required = {
+        "start_annotation_token",
+        "end_annotation_token",
+        "instance_token",
+        "category",
+        "vx_mps",
+        "vy_mps",
+    }
+
+    _require_columns(radar_radial_df, radial_required, "radar_radial_df")
+    _require_columns(vehicle_reference_df, reference_required, "vehicle_reference_df")
+
+    radial_by_annotation = {
+        token: group
+        for token, group in radar_radial_df.groupby("annotation_token")
+    }
+
+    validation_tables = []
+
+    for _, interval in vehicle_reference_df.iterrows():
+        points = radial_by_annotation.get(interval["start_annotation_token"])
+
+        if points is None or points.empty:
+            continue
+
+        data = points[
+            [
+                "annotation_token",
+                "sensor",
+                "radar_radial_velocity_mps",
+                "los_global_x",
+                "los_global_y",
+            ]
+        ].copy()
+
+        data["reference_radial_velocity_mps"] = (
+            interval["vx_mps"] * data["los_global_x"]
+            + interval["vy_mps"] * data["los_global_y"]
+        )
+
+        data["radial_residual_mps"] = (
+            data["radar_radial_velocity_mps"]
+            - data["reference_radial_velocity_mps"]
+        )
+
+        data["radial_abs_error_mps"] = data["radial_residual_mps"].abs()
+
+        data["start_annotation_token"] = interval["start_annotation_token"]
+        data["end_annotation_token"] = interval["end_annotation_token"]
+        data["instance_token"] = interval["instance_token"]
+        data["category"] = interval["category"]
+
+        validation_tables.append(data)
+
+    if not validation_tables:
+        return pd.DataFrame()
+
+    return pd.concat(validation_tables, ignore_index=True)
 
 def _huber_irls(U, b, max_iter=20, tol=1e-6):
     """Estimate a velocity vector using Huber iteratively reweighted least squares."""
