@@ -14,6 +14,7 @@ const els = {
   topdownWrap: document.getElementById("topdown-wrap"),
   plot3dWrap: document.getElementById("plot3d-wrap"),
   cameraImg: document.getElementById("camera-img"),
+  cameraOverlay: document.getElementById("camera-overlay"),
   cameraCol: document.getElementById("camera-col"),
   cameraSelect: document.getElementById("camera-select"),
   mainTitle: document.getElementById("main-view-title"),
@@ -177,7 +178,39 @@ async function render3D(sample, sensors, annotations, detections, minScore) {
   Plotly.react(els.plot3dWrap, traces, layout, { displayModeBar: false });
 }
 
-function updateCamera(sample) {
+function cameraOverlayUrl(token, channel, sensors, annotations, detections, minScore) {
+  const base = window.SCENE_ENDPOINTS.cameraOverlay
+    .replace("__TOKEN__", token)
+    .replace("__CHANNEL__", channel);
+  return withParams(base, sensors, annotations, detections, minScore);
+}
+
+function drawCameraOverlay(data) {
+  const svgns = "http://www.w3.org/2000/svg";
+  els.cameraOverlay.setAttribute("viewBox", `0 0 ${data.width} ${data.height}`);
+  els.cameraOverlay.innerHTML = "";
+
+  const drawBox = (box, color, dashed) => {
+    BOX_EDGES.forEach(([a, b]) => {
+      const [x1, y1] = box.uv[a];
+      const [x2, y2] = box.uv[b];
+      const line = document.createElementNS(svgns, "line");
+      line.setAttribute("x1", x1);
+      line.setAttribute("y1", y1);
+      line.setAttribute("x2", x2);
+      line.setAttribute("y2", y2);
+      line.setAttribute("stroke", color);
+      line.setAttribute("stroke-width", 2);
+      if (dashed) line.setAttribute("stroke-dasharray", "6,4");
+      els.cameraOverlay.appendChild(line);
+    });
+  };
+
+  (data.annotations || []).forEach((box) => drawBox(box, ANNOTATION_COLOR, false));
+  (data.detections || []).forEach((box) => drawBox(box, DETECTION_COLOR[box.modality] || "#ffffff", true));
+}
+
+async function updateCamera(sample, sensors, annotations, detections, minScore) {
   if (!els.cameraSelect) {
     els.cameraCol.style.display = "none";
     return;
@@ -190,6 +223,19 @@ function updateCamera(sample) {
   }
   els.cameraCol.style.display = "";
   els.cameraImg.src = mediaUrl(info.filename);
+
+  if (!annotations && !detections) {
+    els.cameraOverlay.innerHTML = "";
+    return;
+  }
+
+  try {
+    const res = await fetch(cameraOverlayUrl(sample.token, channel, sensors, annotations, detections, minScore));
+    const data = await res.json();
+    drawCameraOverlay(data);
+  } catch (err) {
+    els.cameraOverlay.innerHTML = "";
+  }
 }
 
 function updateFrame() {
@@ -222,7 +268,7 @@ function updateFrame() {
     render3D(sample, sensors, annotations, detections, minScore);
   }
 
-  updateCamera(sample);
+  updateCamera(sample, sensors, annotations, detections, minScore);
 }
 
 function stepFrame(delta) {
@@ -278,7 +324,9 @@ els.scoreSlider.addEventListener("input", () => {
   updateFrame();
 });
 if (els.cameraSelect) {
-  els.cameraSelect.addEventListener("change", () => updateCamera(samples[frameIndex]));
+  els.cameraSelect.addEventListener("change", () =>
+    updateCamera(samples[frameIndex], selectedSensors(), showAnnotations(), showDetections(), scoreThreshold())
+  );
 }
 
 if (samples.length > 0) {

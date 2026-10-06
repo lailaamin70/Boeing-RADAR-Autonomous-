@@ -83,6 +83,38 @@ def load_points_ego_frame(sample_data_token, modality):
     return points_sensor_to_ego(xyz, calib), color
 
 
+def points_ego_to_sensor(points_xyz, calibrated_sensor):
+    """
+    ego frame to sensor frame. Used to project ego-frame boxes (annotations,
+    detections) into a specific camera's own frame before projecting to
+    pixels.
+    """
+    if len(points_xyz) == 0:
+        return points_xyz
+    shifted = np.array(points_xyz) - np.array(calibrated_sensor["translation"])
+    return quat_rotate(Quaternion(calibrated_sensor["rotation"]).inverse.elements, shifted)
+
+
+def project_box_corners(corners_ego, camera_sample_data_token):
+    """
+    Project 8 ego-frame box corners into 2D pixel coordinates for a
+    camera sample_data.
+    """
+    trucksc = tsl.get_trucksc()
+    sd = trucksc.get("sample_data", camera_sample_data_token)
+    calib = trucksc.get("calibrated_sensor", sd["calibrated_sensor_token"])
+    intrinsic = np.array(calib["camera_intrinsic"])
+
+    cam_frame = points_ego_to_sensor(corners_ego, calib)  # (8, 3)
+    depths = cam_frame[:, 2]
+    if np.any(depths <= 0):
+        return None
+
+    pixels = (intrinsic @ cam_frame.T).T  # (8, 3) homogeneous
+    uv = pixels[:, :2] / pixels[:, 2:3]
+    return uv
+
+
 def _global_to_ego(corners, ego_pose):
     corners = corners - np.array(ego_pose["translation"])
     return quat_rotate(Quaternion(ego_pose["rotation"]).inverse.elements, corners)

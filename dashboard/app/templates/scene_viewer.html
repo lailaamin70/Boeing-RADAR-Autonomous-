@@ -105,7 +105,10 @@
         <div class="col-12" id="camera-col" style="display:none;">
           <div class="channel-card">
             <div class="channel-head"><span>Camera</span></div>
-            <img id="camera-img" alt="Camera view">
+            <div style="position:relative;">
+              <img id="camera-img" alt="Camera view" style="display:block; width:100%;">
+              <svg id="camera-overlay" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></svg>
+            </div>
           </div>
         </div>
       </div>
@@ -121,6 +124,7 @@
     media: "{{ url_for('dashboard.media', filename='__FILE__') }}",
     topdown: "{{ url_for('dashboard.sample_topdown', sample_token='__TOKEN__') }}",
     points: "{{ url_for('dashboard.sample_points', sample_token='__TOKEN__') }}",
+    cameraOverlay: "{{ url_for('dashboard.camera_overlay', sample_token='__TOKEN__', channel='__CHANNEL__') }}",
   };
 </script>
 <script src="{{ url_for('static', filename='js/scene_viewer.js') }}"></script>

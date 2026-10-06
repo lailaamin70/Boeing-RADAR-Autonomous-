@@ -9,7 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from app import geometry, truckscenes_loader as tsl, detections_loader
+from app import detections_loader, geometry, truckscenes_loader as tsl
 
 MODALITY_COLOR = {"radar": "#e2793d", "lidar": "#4bb4c4"}
 ANNOTATION_COLOR = "#f2e5c9"
@@ -188,5 +188,40 @@ def get_points_payload(sample_token, sensors, show_annotations, show_detections=
         ]
     else:
         payload["detections"] = []
+
+    return payload
+
+
+def get_camera_overlay_payload(
+    sample_token, channel, show_annotations=False, show_detections=False, detection_modalities=None, min_score=None
+):
+    """
+    Annotation/detection boxes for one camera channel, so the
+    client can draw an SVG overlay on top of the raw image.
+    """
+    channels = tsl.get_sample_data_by_channel(sample_token)
+    entry = channels.get(channel)
+    if entry is None or entry["modality"] != "camera":
+        raise KeyError(f"no camera channel {channel!r} for sample {sample_token}")
+
+    camera_sd_token = entry["sample_data"]["token"]
+    sd = tsl.get_trucksc().get("sample_data", camera_sd_token)
+    payload = {"width": sd["width"], "height": sd["height"], "annotations": [], "detections": []}
+
+    if show_annotations:
+        for box in _collect_annotation_boxes(sample_token, channels):
+            uv = geometry.project_box_corners(box["corners"], camera_sd_token)
+            if uv is None:
+                continue
+            payload["annotations"].append({"uv": uv.tolist(), "category": box["category"]})
+
+    if show_detections and detection_modalities:
+        for det in get_detections_for_sample(sample_token, detection_modalities, min_score):
+            uv = geometry.project_box_corners(det["corners"], camera_sd_token)
+            if uv is None:
+                continue
+            payload["detections"].append(
+                {"uv": uv.tolist(), "category": det["category"], "modality": det["modality"], "score": det["score"]}
+            )
 
     return payload

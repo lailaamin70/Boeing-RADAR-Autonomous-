@@ -221,6 +221,22 @@ def sample_points(sample_token):
     return jsonify(data)
 
 
+@bp.route("/sample/<sample_token>/camera/<channel>/overlay.json")
+def camera_overlay(sample_token, channel):
+    """Annotation/detection boxes for one camera channel."""
+    sensors = _parse_sensors(request.args)
+    show_annotations = request.args.get("annotations") == "1"
+    show_detections = request.args.get("detections") == "1"
+    min_score = _parse_min_score(request.args)
+    try:
+        data = scene_viewer.get_camera_overlay_payload(
+            sample_token, channel, show_annotations, show_detections, sensors, min_score
+        )
+    except KeyError:
+        abort(404)
+    return jsonify(data)
+
+
 @bp.errorhandler(404)
 def not_found(e):
     return render_template("404.html"), 404
