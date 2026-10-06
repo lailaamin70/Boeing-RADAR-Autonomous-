@@ -31,3 +31,5 @@ checkpoints/
 # Python cache
 __pycache__/
 *.py[cod]
+# Generated plots
+results/object_detection/omnihd/plots/
