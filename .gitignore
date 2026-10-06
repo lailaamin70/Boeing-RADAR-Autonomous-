@@ -16,3 +16,18 @@ data/
 # OS/editor files
 .DS_Store
 Thumbs.db
+# Generated model / dataset artifacts
+*.pkl
+
+# Model checkpoints
+*.pth
+*.pt
+*.ckpt
+
+# Large generated sensor/data folders
+data/
+checkpoints/
+
+# Python cache
+__pycache__/
+*.py[cod]

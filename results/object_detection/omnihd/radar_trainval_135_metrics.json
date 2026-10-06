@@ -1,0 +1,657 @@
+{
+  "experiment": {
+    "model": "OmniHD-pretrained PointPillars",
+    "source_training_dataset": "OmniHD",
+    "evaluation_dataset": "TruckScenes",
+    "prediction_modality": "radar",
+    "interpretation": "OmniHD-pretrained PointPillars transferred to TruckScenes"
+  },
+  "inputs": {
+    "omnihd_root": "E:\\OmniHD-Scenes",
+    "ann_file": "D:\\TruckScenes_OmniHD_trainval_135\\truckscenes_omnihd_trainval_135_infos_enriched.pkl",
+    "predictions": "E:\\Boeing-RADAR-Autonomous-\\results\\object_detection\\omnihd\\radar_trainval_135_predictions.pkl"
+  },
+  "protocol": {
+    "name": "OmniHD/NewScenes adapted center-distance AP",
+    "config": "detection_newsc_config_final",
+    "classes": [
+      "car",
+      "pedestrian",
+      "rider",
+      "large_vehicle"
+    ],
+    "distance_thresholds_m": [
+      1.0,
+      2.0,
+      3.0,
+      4.0
+    ],
+    "min_recall": 0.1,
+    "min_precision": 0.1,
+    "class_range": {
+      "car": [
+        60.0,
+        40.0
+      ],
+      "pedestrian": [
+        60.0,
+        40.0
+      ],
+      "rider": [
+        60.0,
+        40.0
+      ],
+      "large_vehicle": [
+        60.0,
+        40.0
+      ]
+    },
+    "max_boxes_per_sample": 500,
+    "matching": "XY center distance with strict distance < threshold",
+    "operating_point": {
+      "enabled": true,
+      "score_threshold": 0.5,
+      "score_comparison": "prediction score >= score threshold",
+      "match_distance_m": 2.0,
+      "matching_algorithm": "Within each sample and class, predictions are ordered by descending score with original prediction index as the tie-break. Each prediction is matched to the nearest still-unmatched GT; GT index breaks equal-distance ties; distance must be strictly less than match_distance_m."
+    },
+    "visibility_policy": "No native OmniHD camera-visibility filtering. TruckScenes valid_flag represents adapter-retained mapped annotations only.",
+    "reported_metrics": "Official AP/mAP plus fixed-operating-point detection and box errors",
+    "neutral_box_fields": "Size, rotation, velocity, and point count are neutral placeholders inside the official DetectionBox AP path. ATE/ASE/AOE use the real raw GT and prediction arrays, never these placeholders.",
+    "box_error_definitions": {
+      "ate_m": "Mean matched-TP XY center distance in metres.",
+      "ase": "Mean matched-TP 1 - scale IoU, using aligned real w/l/h dimensions as in OmniHD/NewScenes.",
+      "aoe_rad": "Mean matched-TP absolute smallest yaw difference in radians, with 2*pi periodicity for all four evaluated classes."
+    }
+  },
+  "dataset": {
+    "samples": 10063,
+    "gt_boxes_before_range_filter": 223943,
+    "gt_boxes_after_range_filter": 87781,
+    "predictions_before_range_filter": 1506453,
+    "predictions_after_range_filter": 1505375,
+    "gt_boxes_by_class_before_range_filter": {
+      "car": 156123,
+      "pedestrian": 7284,
+      "rider": 1636,
+      "large_vehicle": 58900
+    },
+    "gt_boxes_by_class_after_range_filter": {
+      "car": 61200,
+      "pedestrian": 4559,
+      "rider": 1054,
+      "large_vehicle": 20968
+    },
+    "predictions_by_class_before_range_filter": {
+      "car": 1110883,
+      "pedestrian": 73061,
+      "rider": 131693,
+      "large_vehicle": 190816
+    },
+    "predictions_by_class_after_range_filter": {
+      "car": 1110190,
+      "pedestrian": 73061,
+      "rider": 131679,
+      "large_vehicle": 190445
+    }
+  },
+  "ap_by_class_and_threshold": {
+    "car": {
+      "1.0": 0.0,
+      "2.0": 0.00880535444836696,
+      "3.0": 0.03173405249280239,
+      "4.0": 0.049495139619501145
+    },
+    "pedestrian": {
+      "1.0": 0.0,
+      "2.0": 0.0,
+      "3.0": 0.0,
+      "4.0": 0.0
+    },
+    "rider": {
+      "1.0": 0.0,
+      "2.0": 0.0,
+      "3.0": 0.0,
+      "4.0": 0.0
+    },
+    "large_vehicle": {
+      "1.0": 0.0,
+      "2.0": 0.0,
+      "3.0": 0.0028184833185152347,
+      "4.0": 0.007390232476173554
+    }
+  },
+  "class_ap": {
+    "car": 0.022508636640167626,
+    "pedestrian": 0.0,
+    "rider": 0.0,
+    "large_vehicle": 0.0025521789486721972
+  },
+  "mAP": 0.006265203897209956,
+  "overall_metrics": {
+    "mAP": 0.006265203897209956,
+    "operating_point": {
+      "gt_count": 87781,
+      "prediction_count": 9487,
+      "tp": 3414,
+      "fp": 6073,
+      "fn": 84367,
+      "precision": 0.3598608622325287,
+      "recall": 0.03889224319613584,
+      "f1_score": 0.0701978040054283,
+      "ate_m": 1.0243992384263818,
+      "ase": 0.31380317668624125,
+      "aoe_rad": 0.05355547505714311
+    }
+  },
+  "class_metrics": {
+    "car": {
+      "ap_by_distance_threshold": {
+        "1.0": 0.0,
+        "2.0": 0.00880535444836696,
+        "3.0": 0.03173405249280239,
+        "4.0": 0.049495139619501145
+      },
+      "mean_ap": 0.022508636640167626,
+      "operating_point": {
+        "gt_count": 61200,
+        "prediction_count": 3954,
+        "tp": 2379,
+        "fp": 1575,
+        "fn": 58821,
+        "precision": 0.6016691957511381,
+        "recall": 0.03887254901960784,
+        "f1_score": 0.07302698222672438,
+        "ate_m": 1.0142263403161915,
+        "ase": 0.27486643527852844,
+        "aoe_rad": 0.03717476587024872
+      }
+    },
+    "pedestrian": {
+      "ap_by_distance_threshold": {
+        "1.0": 0.0,
+        "2.0": 0.0,
+        "3.0": 0.0,
+        "4.0": 0.0
+      },
+      "mean_ap": 0.0,
+      "operating_point": {
+        "gt_count": 4559,
+        "prediction_count": 0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 4559,
+        "precision": null,
+        "recall": 0.0,
+        "f1_score": null,
+        "ate_m": null,
+        "ase": null,
+        "aoe_rad": null
+      }
+    },
+    "rider": {
+      "ap_by_distance_threshold": {
+        "1.0": 0.0,
+        "2.0": 0.0,
+        "3.0": 0.0,
+        "4.0": 0.0
+      },
+      "mean_ap": 0.0,
+      "operating_point": {
+        "gt_count": 1054,
+        "prediction_count": 7,
+        "tp": 0,
+        "fp": 7,
+        "fn": 1054,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "ate_m": null,
+        "ase": null,
+        "aoe_rad": null
+      }
+    },
+    "large_vehicle": {
+      "ap_by_distance_threshold": {
+        "1.0": 0.0,
+        "2.0": 0.0,
+        "3.0": 0.0028184833185152347,
+        "4.0": 0.007390232476173554
+      },
+      "mean_ap": 0.0025521789486721972,
+      "operating_point": {
+        "gt_count": 20968,
+        "prediction_count": 5526,
+        "tp": 1035,
+        "fp": 4491,
+        "fn": 19933,
+        "precision": 0.18729641693811075,
+        "recall": 0.0493609309423884,
+        "f1_score": 0.0781308975617121,
+        "ate_m": 1.0477821607492357,
+        "ase": 0.4033012518639699,
+        "aoe_rad": 0.09120736602875823
+      }
+    }
+  },
+  "distance_metrics": {
+    "supported": true,
+    "distance_definition": "sqrt(x^2 + y^2) in metres",
+    "bin_boundaries": "lower-inclusive, upper-exclusive",
+    "attribution": "Matched predictions use matched GT distance; unmatched predictions use prediction distance; unmatched GT uses GT distance.",
+    "bins": {
+      "0-25": {
+        "gt_count": 28610,
+        "prediction_count": 3485,
+        "tp": 1293,
+        "fp": 2192,
+        "fn": 27317,
+        "precision": 0.37101865136298423,
+        "recall": 0.04519398811604334,
+        "f1_score": 0.08057329802149868,
+        "ate_m": 0.9370695444871922,
+        "ase": 0.2898113595923419,
+        "aoe_rad": 0.057796813049542345
+      },
+      "25-50": {
+        "gt_count": 42670,
+        "prediction_count": 3711,
+        "tp": 1407,
+        "fp": 2304,
+        "fn": 41263,
+        "precision": 0.3791430881164107,
+        "recall": 0.03297398640731193,
+        "f1_score": 0.06067139561458357,
+        "ate_m": 1.0678105699192546,
+        "ase": 0.317992646447355,
+        "aoe_rad": 0.05258758358537783
+      },
+      "50-75": {
+        "gt_count": 16501,
+        "prediction_count": 2291,
+        "tp": 714,
+        "fp": 1577,
+        "fn": 15787,
+        "precision": 0.3116542994325622,
+        "recall": 0.04327010484213078,
+        "f1_score": 0.07598978288633461,
+        "ate_m": 1.0970008502651887,
+        "ase": 0.3489948231127497,
+        "aoe_rad": 0.04778204827367197
+      },
+      "75-100": {
+        "gt_count": 0,
+        "prediction_count": 0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1_score": null,
+        "ate_m": null,
+        "ase": null,
+        "aoe_rad": null
+      },
+      "100+": {
+        "gt_count": 0,
+        "prediction_count": 0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1_score": null,
+        "ate_m": null,
+        "ase": null,
+        "aoe_rad": null
+      }
+    }
+  },
+  "size_metrics": {
+    "supported": true,
+    "size_definition": "3D box volume w*l*h in cubic metres",
+    "bin_definition": "Small/medium/large are GT-volume tertiles after valid_flag and official class-range filtering. Thresholds are recorded below.",
+    "thresholds_m3": {
+      "small_medium": 11.661496870372677,
+      "medium_large": 17.01374043040849
+    },
+    "attribution": "Matched predictions use matched GT size; unmatched predictions use predicted size; unmatched GT uses GT size.",
+    "bins": {
+      "small": {
+        "gt_count": 29239,
+        "prediction_count": 422,
+        "tp": 415,
+        "fp": 7,
+        "fn": 28824,
+        "precision": 0.9834123222748815,
+        "recall": 0.014193371866342898,
+        "f1_score": 0.027982873133070362,
+        "ate_m": 1.0588228783874734,
+        "ase": 0.3206809736596436,
+        "aoe_rad": 0.04912504686734901
+      },
+      "medium": {
+        "gt_count": 29279,
+        "prediction_count": 2956,
+        "tp": 1583,
+        "fp": 1373,
+        "fn": 27696,
+        "precision": 0.5355209742895806,
+        "recall": 0.05406605416851668,
+        "f1_score": 0.09821622460058942,
+        "ate_m": 1.004457783988572,
+        "ase": 0.25183456641525837,
+        "aoe_rad": 0.035906468436303976
+      },
+      "large": {
+        "gt_count": 29263,
+        "prediction_count": 6109,
+        "tp": 1416,
+        "fp": 4693,
+        "fn": 27847,
+        "precision": 0.2317891635292192,
+        "recall": 0.048388750299012406,
+        "f1_score": 0.08006332692525162,
+        "ate_m": 1.0366036959060503,
+        "ase": 0.38106449329288306,
+        "aoe_rad": 0.0745844335172792
+      }
+    }
+  },
+  "visibility_metrics": {
+    "supported": true,
+    "levels": {
+      "1": {
+        "gt_count": 15058,
+        "tp": 152,
+        "fn": 14906,
+        "recall": 0.010094302032142382,
+        "ate_m": 1.1312099069308972,
+        "ase": 0.3595725359250728,
+        "aoe_rad": 0.029619498396173418
+      },
+      "2": {
+        "gt_count": 8286,
+        "tp": 85,
+        "fn": 8201,
+        "recall": 0.010258266956311851,
+        "ate_m": 1.1975817838883875,
+        "ase": 0.36739348984459896,
+        "aoe_rad": 0.07509511384790193
+      },
+      "3": {
+        "gt_count": 10755,
+        "tp": 179,
+        "fn": 10576,
+        "recall": 0.016643421664342167,
+        "ate_m": 1.0310217982852496,
+        "ase": 0.37366628972271715,
+        "aoe_rad": 0.053849082029454896
+      },
+      "4": {
+        "gt_count": 53682,
+        "tp": 2998,
+        "fn": 50684,
+        "recall": 0.055847397637941956,
+        "ate_m": 1.0136783657807213,
+        "ase": 0.30638902843530974,
+        "aoe_rad": 0.05414081311825348
+      }
+    },
+    "level_meaning": {
+      "1": "0-40% visible",
+      "2": "41-60% visible",
+      "3": "61-80% visible",
+      "4": "81-100% visible"
+    },
+    "false_positive_attribution": "Matched predictions inherit the matched GT condition; unmatched GT uses its own condition. Unmatched false positives have no defensible GT condition, so FP, prediction count, precision, and F1 are intentionally omitted."
+  },
+  "motion_metrics": {
+    "supported": true,
+    "states": {
+      "moving": {
+        "gt_count": 67094,
+        "tp": 3410,
+        "fn": 63684,
+        "recall": 0.050824216770501085,
+        "ate_m": 1.0237942451014856,
+        "ase": 0.31376696581871516,
+        "aoe_rad": 0.052660163283866086
+      },
+      "stationary": {
+        "gt_count": 19641,
+        "tp": 4,
+        "fn": 19637,
+        "recall": 0.0002036556183493712,
+        "ate_m": 1.5401560479003047,
+        "ase": 0.3446729412522629,
+        "aoe_rad": 0.816808761775784
+      },
+      "unknown": {
+        "gt_count": 1046,
+        "tp": 0,
+        "fn": 1046,
+        "recall": 0.0,
+        "ate_m": null,
+        "ase": null,
+        "aoe_rad": null
+      }
+    },
+    "false_positive_attribution": "Matched predictions inherit the matched GT condition; unmatched GT uses its own condition. Unmatched false positives have no defensible GT condition, so FP, prediction count, precision, and F1 are intentionally omitted."
+  },
+  "weather_metrics": {
+    "supported": true,
+    "attribution": "The condition is sample-level, so all GT and predictions in a sample inherit the sample condition.",
+    "categories": {
+      "clear": {
+        "sample_count": 5793,
+        "gt_count": 43810,
+        "prediction_count": 6220,
+        "tp": 2952,
+        "fp": 3268,
+        "fn": 40858,
+        "precision": 0.47459807073954985,
+        "recall": 0.06738187628395344,
+        "f1_score": 0.11800919448331003,
+        "ate_m": 1.0151598383863552,
+        "ase": 0.312984406227451,
+        "aoe_rad": 0.04792584346437663
+      },
+      "fog": {
+        "sample_count": 395,
+        "gt_count": 2223,
+        "prediction_count": 505,
+        "tp": 22,
+        "fp": 483,
+        "fn": 2201,
+        "precision": 0.04356435643564356,
+        "recall": 0.009896536212325686,
+        "f1_score": 0.016129032258064516,
+        "ate_m": 1.1663240551005407,
+        "ase": 0.35135165101752386,
+        "aoe_rad": 0.03935977710869257
+      },
+      "other_weather": {
+        "sample_count": 40,
+        "gt_count": 241,
+        "prediction_count": 41,
+        "tp": 7,
+        "fp": 34,
+        "fn": 234,
+        "precision": 0.17073170731707318,
+        "recall": 0.029045643153526972,
+        "f1_score": 0.04964539007092199,
+        "ate_m": 0.7407181484116082,
+        "ase": 0.2513228616781577,
+        "aoe_rad": 0.02144017333054801
+      },
+      "overcast": {
+        "sample_count": 1275,
+        "gt_count": 12966,
+        "prediction_count": 1021,
+        "tp": 90,
+        "fp": 931,
+        "fn": 12876,
+        "precision": 0.0881488736532811,
+        "recall": 0.006941230911614993,
+        "f1_score": 0.01286909272896261,
+        "ate_m": 1.1289281040861476,
+        "ase": 0.27976127117715716,
+        "aoe_rad": 0.08014259487282736
+      },
+      "rain": {
+        "sample_count": 1720,
+        "gt_count": 21815,
+        "prediction_count": 1005,
+        "tp": 198,
+        "fp": 807,
+        "fn": 21617,
+        "precision": 0.19701492537313434,
+        "recall": 0.009076323630529452,
+        "f1_score": 0.017353198948290974,
+        "ate_m": 1.0673683577986608,
+        "ase": 0.3429944607503642,
+        "aoe_rad": 0.11112654605157964
+      },
+      "snow": {
+        "sample_count": 840,
+        "gt_count": 6726,
+        "prediction_count": 695,
+        "tp": 145,
+        "fp": 550,
+        "fn": 6581,
+        "precision": 0.20863309352517986,
+        "recall": 0.021558132619684804,
+        "f1_score": 0.039078291335399536,
+        "ate_m": 1.0811071490218316,
+        "ase": 0.3090597519637603,
+        "aoe_rad": 0.07675459290878928
+      }
+    }
+  },
+  "area_metrics": {
+    "supported": true,
+    "attribution": "The condition is sample-level, so all GT and predictions in a sample inherit the sample condition.",
+    "categories": {
+      "city": {
+        "sample_count": 720,
+        "gt_count": 16660,
+        "prediction_count": 495,
+        "tp": 55,
+        "fp": 440,
+        "fn": 16605,
+        "precision": 0.1111111111111111,
+        "recall": 0.0033013205282112846,
+        "f1_score": 0.006412124744972311,
+        "ate_m": 1.4457083545316376,
+        "ase": 0.3473020110242453,
+        "aoe_rad": 0.06233012043863727
+      },
+      "highway": {
+        "sample_count": 7188,
+        "gt_count": 55818,
+        "prediction_count": 8115,
+        "tp": 3291,
+        "fp": 4824,
+        "fn": 52527,
+        "precision": 0.4055452865064695,
+        "recall": 0.05895947543803074,
+        "f1_score": 0.10295152738022617,
+        "ate_m": 1.0133300097835458,
+        "ase": 0.3126716847151571,
+        "aoe_rad": 0.05063662689794229
+      },
+      "other_area": {
+        "sample_count": 40,
+        "gt_count": 410,
+        "prediction_count": 4,
+        "tp": 0,
+        "fp": 4,
+        "fn": 410,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "ate_m": null,
+        "ase": null,
+        "aoe_rad": null
+      },
+      "parking": {
+        "sample_count": 80,
+        "gt_count": 1912,
+        "prediction_count": 0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 1912,
+        "precision": null,
+        "recall": 0.0,
+        "f1_score": null,
+        "ate_m": null,
+        "ase": null,
+        "aoe_rad": null
+      },
+      "residential": {
+        "sample_count": 240,
+        "gt_count": 1991,
+        "prediction_count": 180,
+        "tp": 10,
+        "fp": 170,
+        "fn": 1981,
+        "precision": 0.05555555555555555,
+        "recall": 0.005022601707684581,
+        "f1_score": 0.009212344541685858,
+        "ate_m": 1.5015729060115066,
+        "ase": 0.31822022235177494,
+        "aoe_rad": 0.3550877295330678
+      },
+      "rural": {
+        "sample_count": 915,
+        "gt_count": 4827,
+        "prediction_count": 675,
+        "tp": 58,
+        "fp": 617,
+        "fn": 4769,
+        "precision": 0.08592592592592592,
+        "recall": 0.012015744769007665,
+        "f1_score": 0.021083242457288258,
+        "ate_m": 1.170693952252829,
+        "ase": 0.3454778961964701,
+        "aoe_rad": 0.15886584145694482
+      },
+      "terminal": {
+        "sample_count": 880,
+        "gt_count": 6163,
+        "prediction_count": 18,
+        "tp": 0,
+        "fp": 18,
+        "fn": 6163,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "ate_m": null,
+        "ase": null,
+        "aoe_rad": null
+      }
+    }
+  },
+  "supported_metrics": [
+    "official_ap",
+    "class_mean_ap",
+    "overall_map",
+    "tp_fp_fn",
+    "precision_recall_f1",
+    "ate",
+    "class_breakdown",
+    "distance_breakdown",
+    "ase",
+    "aoe",
+    "size_breakdown",
+    "visibility_breakdown",
+    "weather_breakdown",
+    "motion_breakdown",
+    "area_breakdown"
+  ],
+  "unsupported_metrics": {
+    "ave": "Compatible GT object velocity is unavailable and is not fabricated.",
+    "lidar_radar_complementarity": "A second-modality trainval prediction PKL is not part of this run."
+  }
+}
