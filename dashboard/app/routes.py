@@ -1,21 +1,25 @@
+import json
 import os
 
 from flask import Blueprint, abort, current_app, jsonify, render_template, request, send_file
 from werkzeug.security import safe_join
 
-from app import analytics, truckscenes_loader as tsl
+from app import analytics, scene_viewer, truckscenes_loader as tsl
 
 bp = Blueprint("dashboard", __name__)
 
+VALID_SENSORS = ("radar", "lidar")
 
 @bp.route("/")
 def index():
+    """Scene list, with optional tag filter and simple pagination."""
     tag_filter = request.args.get("tag", "").strip()
     page = max(int(request.args.get("page", 1)), 1)
     per_page = current_app.config["SCENES_PER_PAGE"]
 
     scenes = tsl.list_scenes()
 
+    # Collect every distinct tag across all scenes for the filter dropdown
     all_tags = sorted({tag for s in scenes for tag in s["tags"]})
 
     if tag_filter:
@@ -102,6 +106,7 @@ def media(filename):
         abort(404)
     return send_file(safe_path)
 
+
 @bp.route("/analysis")
 def analysis():
     """Cross-scene comparison page"""
@@ -131,6 +136,106 @@ def api_analysis():
         include_expensive=include_expensive,
     )
     return jsonify(data)
+
+
+@bp.route("/scene/<scene_token>/viewer")
+def scene_viewer_page(scene_token):
+    """Scene player: top-down/3D view, sensor toggles, annotation overlay."""
+    try:
+        scene = tsl.get_scene(scene_token)
+    except KeyError:
+        abort(404)
+
+    samples = tsl.list_samples_for_scene(scene_token)
+
+    # Per sample metadata for playback
+    samples_payload = []
+    camera_channels = set()
+    for s in samples:
+        channels = tsl.get_sample_data_by_channel(s["token"])
+        entry = {"token": s["token"], "timestamp": s["timestamp"], "channels": {}}
+        for channel, info in channels.items():
+            entry["channels"][channel] = {
+                "modality": info["modality"],
+                "filename": info["sample_data"]["filename"] if info["modality"] == "camera" else None,
+            }
+            if info["modality"] == "camera":
+                camera_channels.add(channel)
+        samples_payload.append(entry)
+
+    return render_template(
+        "scene_viewer.html",
+        scene=scene,
+        samples_json=json.dumps(samples_payload),
+        camera_channels=sorted(camera_channels),
+    )
+
+
+def _parse_sensors(args):
+    sensors = [s for s in args.getlist("sensor") if s in VALID_SENSORS]
+    return sensors or list(VALID_SENSORS)
+
+
+def _parse_min_score(args):
+    """
+    None means "use detections_loader's default"
+    """
+    raw = args.get("min_score")
+    if raw is None or raw == "":
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+@bp.route("/sample/<sample_token>/topdown.png")
+def sample_topdown(sample_token):
+    """Radar/Lidar top-down PNG for one frame."""
+    sensors = _parse_sensors(request.args)
+    show_annotations = request.args.get("annotations") == "1"
+    show_detections = request.args.get("detections") == "1"
+    min_score = _parse_min_score(request.args)
+    try:
+        buf = scene_viewer.render_topdown_png(
+            sample_token, sensors, show_annotations, show_detections, min_score
+        )
+    except KeyError:
+        abort(404)
+    return send_file(buf, mimetype="image/png")
+
+
+@bp.route("/sample/<sample_token>/points.json")
+def sample_points(sample_token):
+    """Radar/Lidar points and annotation boxes for the 3D view."""
+    sensors = _parse_sensors(request.args)
+    show_annotations = request.args.get("annotations") == "1"
+    show_detections = request.args.get("detections") == "1"
+    min_score = _parse_min_score(request.args)
+    try:
+        data = scene_viewer.get_points_payload(
+            sample_token, sensors, show_annotations, show_detections, min_score
+        )
+    except KeyError:
+        abort(404)
+    return jsonify(data)
+
+
+@bp.route("/sample/<sample_token>/camera/<channel>/overlay.json")
+def camera_overlay(sample_token, channel):
+    """Annotation/detection boxes for one camera channel."""
+    sensors = _parse_sensors(request.args)
+    show_annotations = request.args.get("annotations") == "1"
+    show_detections = request.args.get("detections") == "1"
+    min_score = _parse_min_score(request.args)
+    try:
+        data = scene_viewer.get_camera_overlay_payload(
+            sample_token, channel, show_annotations, show_detections, sensors, min_score
+        )
+    except KeyError:
+        abort(404)
+    return jsonify(data)
+
 
 @bp.errorhandler(404)
 def not_found(e):

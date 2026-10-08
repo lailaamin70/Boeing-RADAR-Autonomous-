@@ -9,10 +9,15 @@
   <h1 class="h4 mb-1">{{ scene.name }}</h1>
   <div class="text-dim mono mb-3">{{ scene.token }}</div>
 
-  <div class="mb-4">
-    {% for tag in tags %}
-      <span class="tag">{{ tag }}</span>
-    {% endfor %}
+  <div class="mb-4 d-flex justify-content-between align-items-start">
+    <div>
+      {% for tag in tags %}
+        <span class="tag">{{ tag }}</span>
+      {% endfor %}
+    </div>
+    <a href="{{ url_for('dashboard.scene_viewer_page', scene_token=scene.token) }}" class="btn btn-accent btn-sm">
+      Open scene viewer
+    </a>
   </div>
 
   <div class="panel mb-4">
