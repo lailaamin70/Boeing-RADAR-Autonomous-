@@ -37,9 +37,9 @@
     ]
   },
   "inputs": {
-    "ann_file": "D:\\TruckScenes_OmniHD_trainval_135\\truckscenes_omnihd_trainval_135_infos_enriched.pkl",
-    "lidar_predictions": "E:\\Boeing-RADAR-Autonomous-\\results\\object_detection\\omnihd\\lidar_trainval_135_predictions.pkl",
-    "radar_predictions": "E:\\Boeing-RADAR-Autonomous-\\results\\object_detection\\omnihd\\radar_trainval_135_predictions.pkl"
+    "ann_file": "truckscenes_omnihd_trainval_135_infos_enriched.pkl",
+    "lidar_predictions": "lidar_trainval_135_predictions.pkl",
+    "radar_predictions": "radar_trainval_135_predictions.pkl"
   },
   "overall": {
     "total_gt": 87781,
