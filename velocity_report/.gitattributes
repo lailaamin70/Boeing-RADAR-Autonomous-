@@ -1,4 +1,0 @@
-df/condition/available_sample_data.csv filter=lfs diff=lfs merge=lfs -text
-df/condition/radar_radial_df.csv filter=lfs diff=lfs merge=lfs -text
-df/condition/radar_validation_df.csv filter=lfs diff=lfs merge=lfs -text
-df/condition/vehicle_reference_df.csv filter=lfs diff=lfs merge=lfs -text
