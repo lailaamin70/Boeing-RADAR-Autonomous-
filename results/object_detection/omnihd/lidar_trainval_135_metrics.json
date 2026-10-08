@@ -7,9 +7,9 @@
     "interpretation": "OmniHD-pretrained PointPillars transferred to TruckScenes"
   },
   "inputs": {
-    "omnihd_root": "E:\\OmniHD-Scenes",
-    "ann_file": "D:\\TruckScenes_OmniHD_trainval_135\\truckscenes_omnihd_trainval_135_infos_enriched.pkl",
-    "predictions": "E:\\Boeing-RADAR-Autonomous-\\results\\object_detection\\omnihd\\lidar_trainval_135_predictions.pkl"
+    "omnihd_root": "OmniHD-Scenes",
+    "ann_file": "truckscenes_omnihd_trainval_135_infos_enriched.pkl",
+    "predictions": "lidar_trainval_135_predictions.pkl"
   },
   "protocol": {
     "name": "OmniHD/NewScenes adapted center-distance AP",

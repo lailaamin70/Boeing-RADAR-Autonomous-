@@ -56,6 +56,14 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="Destination JSON file for all evaluation metrics.",
     )
     parser.add_argument(
+        "--eval-config",
+        default=CONFIG_NAME,
+        help=(
+            "OmniHD/NewScenes evaluation config identifier "
+            "(default: {}).".format(CONFIG_NAME)
+        ),
+    )
+    parser.add_argument(
         "--score-threshold",
         type=float,
         default=None,
@@ -154,6 +162,11 @@ def import_official_evaluation(omnihd_root: Path) -> Dict[str, Any]:
         "calc_ap": calc_ap,
         "config_factory": config_factory,
     }
+
+
+def _portable_input_name(path: Path) -> str:
+    """Return only an input filename for portable JSON provenance."""
+    return path.name
 
 
 def validate_official_config(cfg: Any) -> None:
@@ -1116,6 +1129,7 @@ def build_result(
     class_ap: Mapping[str, float],
     mean_ap: float,
     operating_metrics: Optional[Mapping[str, Any]],
+    config_name: str = CONFIG_NAME,
 ) -> Dict[str, Any]:
     """Build a JSON-safe report while preserving the original AP fields."""
     operating_enabled = operating_metrics is not None
@@ -1130,13 +1144,13 @@ def build_result(
             ),
         },
         "inputs": {
-            "omnihd_root": str(paths["omnihd_root"]),
-            "ann_file": str(paths["ann_file"]),
-            "predictions": str(paths["predictions"]),
+            "omnihd_root": "OmniHD-Scenes",
+            "ann_file": _portable_input_name(paths["ann_file"]),
+            "predictions": _portable_input_name(paths["predictions"]),
         },
         "protocol": {
             "name": "OmniHD/NewScenes adapted center-distance AP",
-            "config": CONFIG_NAME,
+            "config": config_name,
             "classes": list(CLASSES),
             "distance_thresholds_m": [float(value) for value in cfg.dist_ths],
             "min_recall": float(cfg.min_recall),
@@ -1472,7 +1486,7 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
     operating_enabled = validate_operating_point_args(args)
     paths = resolve_paths(args)
     official = import_official_evaluation(paths["omnihd_root"])
-    cfg = official["config_factory"](CONFIG_NAME)
+    cfg = official["config_factory"](args.eval_config)
     validate_official_config(cfg)
 
     gt_payload = load_pickle(paths["ann_file"], "infos", "annotation pickle")
@@ -1519,6 +1533,7 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
         class_ap,
         mean_ap,
         operating_metrics,
+        args.eval_config,
     )
     save_json(result, paths["output"])
     print_result(result, paths["output"])
