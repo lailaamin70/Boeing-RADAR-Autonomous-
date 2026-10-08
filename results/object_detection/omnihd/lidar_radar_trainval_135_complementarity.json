@@ -476,24 +476,16 @@
   "validation": {
     "sample_token_sets_equal": true,
     "sample_count": 10063,
-    "expected_sample_count": 10063,
-    "every_gt_categorized_once": true,
     "processed_gt_identities": 87781,
+    "every_gt_categorized_once": true,
     "category_sum_matches_total": true,
-    "standalone_recall": {
-      "tolerance": 1e-12,
-      "lidar": {
-        "expected": 0.39085906973035167,
-        "actual": 0.39085906973035167,
-        "absolute_error": 0.0,
-        "passed": true
-      },
-      "radar": {
-        "expected": 0.03889224319613584,
-        "actual": 0.03889224319613584,
-        "absolute_error": 0.0,
-        "passed": true
-      }
-    }
+    "lidar_tp_consistent": true,
+    "radar_tp_consistent": true,
+    "lidar_misses_consistent": true,
+    "radar_misses_consistent": true,
+    "union_detected_consistent": true,
+    "lidar_recall_consistent": true,
+    "radar_recall_consistent": true,
+    "union_recall_consistent": true
   }
 }

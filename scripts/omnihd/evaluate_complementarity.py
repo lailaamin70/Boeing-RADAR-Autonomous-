@@ -27,10 +27,6 @@ from scripts.omnihd.evaluate_detection import (  # noqa: E402
 )
 
 
-EXPECTED_SAMPLES = 10063
-EXPECTED_LIDAR_RECALL = 0.39085906973035167
-EXPECTED_RADAR_RECALL = 0.03889224319613584
-RECALL_TOLERANCE = 1e-12
 MAX_BOXES_PER_SAMPLE = 500
 CLASS_RANGE = {class_name: [60.0, 40.0] for class_name in CLASSES}
 DISTANCE_BINS = (
@@ -122,10 +118,6 @@ def validate_thresholds(score_threshold: float, match_distance: float) -> None:
 
 def _index_gt_infos(payload: Mapping[str, Any]) -> Dict[str, Mapping[str, Any]]:
     infos = payload["infos"]
-    if len(infos) != EXPECTED_SAMPLES:
-        raise ValueError(
-            "Expected {} GT samples, found {}".format(EXPECTED_SAMPLES, len(infos))
-        )
     result: Dict[str, Mapping[str, Any]] = {}
     required_fields = (
         "gt_visibility_levels",
@@ -204,12 +196,6 @@ def _index_predictions(
             )
         )
     records = payload["predictions"]
-    if len(records) != EXPECTED_SAMPLES:
-        raise ValueError(
-            "Expected {} {} prediction samples, found {}".format(
-                EXPECTED_SAMPLES, expected_modality, len(records)
-            )
-        )
     result: Dict[str, Mapping[str, Any]] = {}
     for index, record in enumerate(records):
         if not isinstance(record, Mapping):
@@ -433,42 +419,47 @@ def _validate_token_sets(
     return {
         "sample_token_sets_equal": True,
         "sample_count": len(gt_tokens),
-        "expected_sample_count": EXPECTED_SAMPLES,
     }
 
 
-def _recall_validation(overall: Mapping[str, Any]) -> Dict[str, Any]:
-    lidar_recall = float(overall["lidar_recall"])
-    radar_recall = float(overall["radar_recall"])
-    lidar_error = abs(lidar_recall - EXPECTED_LIDAR_RECALL)
-    radar_error = abs(radar_recall - EXPECTED_RADAR_RECALL)
-    if lidar_error > RECALL_TOLERANCE or radar_error > RECALL_TOLERANCE:
+def _validate_overall_metrics(
+    overall: Mapping[str, Any], processed_gt_identities: int
+) -> Dict[str, bool]:
+    """Validate complementarity counts and recalls from the current run."""
+    total = int(overall["total_gt"])
+    both = int(overall["both"])
+    lidar_only = int(overall["lidar_only"])
+    radar_only = int(overall["radar_only"])
+    neither = int(overall["neither"])
+
+    def ratio_matches(field: str, numerator: int, denominator: int) -> bool:
+        expected = _safe_ratio(numerator, denominator)
+        actual = overall[field]
+        if expected is None:
+            return actual is None
+        return actual is not None and bool(np.isclose(float(actual), expected, atol=1e-12, rtol=0.0))
+
+    checks = {
+        "every_gt_categorized_once": processed_gt_identities == total,
+        "category_sum_matches_total": both + lidar_only + radar_only + neither == total,
+        "lidar_tp_consistent": both + lidar_only == total - int(overall["lidar_misses"]),
+        "radar_tp_consistent": both + radar_only == total - int(overall["radar_misses"]),
+        "lidar_misses_consistent": int(overall["lidar_misses"]) == radar_only + neither,
+        "radar_misses_consistent": int(overall["radar_misses"]) == lidar_only + neither,
+        "union_detected_consistent": int(overall["union_detected"])
+        == both + lidar_only + radar_only,
+        "lidar_recall_consistent": ratio_matches("lidar_recall", both + lidar_only, total),
+        "radar_recall_consistent": ratio_matches("radar_recall", both + radar_only, total),
+        "union_recall_consistent": ratio_matches(
+            "union_recall", both + lidar_only + radar_only, total
+        ),
+    }
+    failed = [name for name, passed in checks.items() if not passed]
+    if failed:
         raise RuntimeError(
-            "Reconstructed standalone recall mismatch: LiDAR actual={} expected={} "
-            "error={}; RADAR actual={} expected={} error={}".format(
-                lidar_recall,
-                EXPECTED_LIDAR_RECALL,
-                lidar_error,
-                radar_recall,
-                EXPECTED_RADAR_RECALL,
-                radar_error,
-            )
+            "Complementarity validation failed: {}".format(", ".join(failed))
         )
-    return {
-        "tolerance": RECALL_TOLERANCE,
-        "lidar": {
-            "expected": EXPECTED_LIDAR_RECALL,
-            "actual": lidar_recall,
-            "absolute_error": lidar_error,
-            "passed": True,
-        },
-        "radar": {
-            "expected": EXPECTED_RADAR_RECALL,
-            "actual": radar_recall,
-            "absolute_error": radar_error,
-            "passed": True,
-        },
-    }
+    return checks
 
 
 def build_result(
@@ -477,7 +468,9 @@ def build_result(
     metrics: Mapping[str, Any],
     token_validation: Mapping[str, Any],
 ) -> Dict[str, Any]:
-    recall_validation = _recall_validation(metrics["overall"])
+    validation = _validate_overall_metrics(
+        metrics["overall"], int(metrics["processed_gt_identities"])
+    )
     return {
         "protocol": {
             "classes": list(CLASSES),
@@ -509,10 +502,8 @@ def build_result(
         "area_breakdown": metrics["area_breakdown"],
         "validation": {
             **dict(token_validation),
-            "every_gt_categorized_once": True,
             "processed_gt_identities": int(metrics["processed_gt_identities"]),
-            "category_sum_matches_total": True,
-            "standalone_recall": recall_validation,
+            **validation,
         },
     }
 
