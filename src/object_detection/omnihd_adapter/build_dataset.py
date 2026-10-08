@@ -408,7 +408,7 @@ def _safe_path_component(value: object, name: str) -> str:
 
 def _stored_output_path(config: BuildConfig, relative_path: Path) -> str:
     if config.metadata_path_prefix is None:
-        return (Path(config.output_root) / relative_path).resolve().as_posix()
+        return PurePosixPath(*relative_path.parts).as_posix()
     prefix = PurePosixPath(str(config.metadata_path_prefix).replace("\\", "/"))
     relative = PurePosixPath(*relative_path.parts)
     return (prefix / relative).as_posix()
@@ -840,9 +840,9 @@ def build_dataset(config: BuildConfig) -> dict[str, Any]:
         "source_dataset": "TruckScenes",
         "source_metadata_version": config.metadata_version,
         "target_format": "OmniHD/NewScenes",
-        "info_file": info_path.resolve().as_posix(),
+        "info_file": PurePosixPath(config.info_filename).as_posix(),
         "path_policy": (
-            "resolved_local_paths"
+            "output_relative_paths"
             if config.metadata_path_prefix is None
             else "metadata_path_prefix_plus_output_relative_path"
         ),
