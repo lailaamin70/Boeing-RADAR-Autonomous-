@@ -49,17 +49,26 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--data-root",
         required=True,
-        help="Root of the converted TruckScenes dataset.",
+        help=(
+            "Root of the converted TruckScenes dataset; relative paths resolve "
+            "from the launch directory."
+        ),
     )
     parser.add_argument(
         "--ann-file",
         required=True,
-        help="Converted TruckScenes OmniHD-style annotation pickle.",
+        help=(
+            "Converted TruckScenes OmniHD-style annotation pickle; relative paths "
+            "resolve from the launch directory."
+        ),
     )
     parser.add_argument(
         "--output",
         required=True,
-        help="Destination prediction pickle.",
+        help=(
+            "Destination prediction pickle; relative paths resolve from the "
+            "launch directory."
+        ),
     )
     parser.add_argument(
         "--max-samples",
@@ -90,7 +99,7 @@ def _resolve_path(value: str, base: Path) -> Path:
 
 
 def _resolve_and_validate_paths(args: argparse.Namespace) -> Dict[str, Path]:
-    """Resolve paths before changing to the external OmniHD repository."""
+    """Resolve config/checkpoint from OmniHD and other paths from launch cwd."""
     launch_directory = Path.cwd().resolve()
     omnihd_root = _resolve_path(args.omnihd_root, launch_directory)
     config = _resolve_path(args.config, omnihd_root)
@@ -238,11 +247,10 @@ def _register_radar_components(omnihd_root: Path) -> None:
 
 
 def _import_omnihd_dependencies(omnihd_root: Path) -> Dict[str, Any]:
-    """Import the legacy runtime and minimally register RADAR components."""
+    """Import the legacy runtime after adding its root to ``sys.path``."""
     root_string = str(omnihd_root)
     if root_string not in sys.path:
         sys.path.insert(0, root_string)
-    os.chdir(root_string)
 
     try:
         import torch
@@ -272,6 +280,16 @@ def _import_omnihd_dependencies(omnihd_root: Path) -> Dict[str, Any]:
         "build_dataset": build_dataset,
         "build_model": build_model,
     }
+
+
+def _portable_metadata_path(path: Path, base: Optional[Path] = None) -> str:
+    """Serialize a path without exposing machine-specific absolute locations."""
+    if base is not None:
+        try:
+            return path.relative_to(base).as_posix()
+        except ValueError:
+            pass
+    return path.name
 
 
 def _pipeline_stages(pipeline: Sequence[Mapping[str, Any]]) -> List[Mapping[str, Any]]:
@@ -472,11 +490,15 @@ def _build_output(
             "model": MODEL_NAME,
             "modality": "radar",
             "classes": list(classes),
-            "omnihd_root": str(paths["omnihd_root"]),
-            "config": str(paths["config"]),
-            "checkpoint": str(paths["checkpoint"]),
-            "data_root": str(paths["data_root"]),
-            "ann_file": str(paths["ann_file"]),
+            "omnihd_root": "OmniHD-Scenes",
+            "config": _portable_metadata_path(
+                paths["config"], paths["omnihd_root"]
+            ),
+            "checkpoint": _portable_metadata_path(
+                paths["checkpoint"], paths["omnihd_root"]
+            ),
+            "data_root": _portable_metadata_path(paths["data_root"]),
+            "ann_file": _portable_metadata_path(paths["ann_file"]),
             "gpu": gpu_name,
             "torch_version": torch_version,
             "cuda_runtime": cuda_runtime,
