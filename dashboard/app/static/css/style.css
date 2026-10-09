@@ -1,0 +1,201 @@
+:root {
+  --bg: #12161d;
+  --panel: #1a2029;
+  --panel-raised: #202836;
+  --border: #2a3140;
+  --text: #dde3ea;
+  --text-dim: #8b93a3;
+  --accent-radar: #e2793d;
+  --accent-lidar: #4bb4c4;
+  --accent-camera: #7f9fd9;
+  --accent: #e2793d;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+}
+
+.mono {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* --- Layout shell --- */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 1.5rem 1.25rem;
+}
+
+.sidebar .brand {
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+.sidebar .brand-sub {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin-bottom: 2rem;
+}
+
+.sidebar nav a {
+  display: block;
+  color: var(--text-dim);
+  text-decoration: none;
+  padding: 0.4rem 0;
+  font-size: 0.92rem;
+  border-left: 2px solid transparent;
+  padding-left: 0.6rem;
+  margin-left: -0.6rem;
+}
+
+.sidebar nav a:hover,
+.sidebar nav a.active {
+  color: var(--text);
+  border-left-color: var(--accent);
+}
+
+.main {
+  flex: 1;
+  padding: 2rem 2.5rem;
+  max-width: 1200px;
+}
+
+/* --- Cards / panels --- */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.1rem 1.3rem;
+}
+
+.scene-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.1rem 1.3rem;
+  text-decoration: none;
+  color: var(--text);
+  display: block;
+  transition: border-color 0.15s ease;
+}
+
+.scene-card:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.scene-card .scene-name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.scene-card .scene-meta {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  margin-top: 0.15rem;
+}
+
+/* --- Tags / badges --- */
+.tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1rem 0.5rem;
+  margin: 0.1rem 0.25rem 0.1rem 0;
+}
+
+.tag.active {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* --- Modality colour coding --- */
+.badge-radar { color: var(--accent-radar); border-color: var(--accent-radar); }
+.badge-lidar { color: var(--accent-lidar); border-color: var(--accent-lidar); }
+.badge-camera { color: var(--accent-camera); border-color: var(--accent-camera); }
+
+/* --- Sample timeline --- */
+.sample-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.sample-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 4px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.sample-dot:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* --- Channel tabs on sample page --- */
+.channel-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.channel-card .channel-head {
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.channel-card img {
+  width: 100%;
+  display: block;
+  background: #000;
+}
+
+a { color: var(--accent-camera); }
+a:hover { color: var(--accent); }
+
+.text-dim { color: var(--text-dim); }
+
+.btn-accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #14161c;
+  font-weight: 500;
+}
+
+.btn-accent:hover {
+  background: #c9642c;
+  border-color: #c9642c;
+  color: #14161c;
+}

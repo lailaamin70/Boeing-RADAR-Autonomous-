@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Scenes - TruckScenes Explorer{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-end mb-3">
+    <div>
+      <h1 class="h4 mb-1">Scenes</h1>
+      <div class="text-dim">{{ total }} scene{{ 's' if total != 1 else '' }} in {{ version }}</div>
+    </div>
+  </div>
+
+  {% if all_tags %}
+  <div class="mb-4">
+    <a href="{{ url_for('dashboard.index') }}" class="tag {{ 'active' if not active_tag else '' }}">all</a>
+    {% for tag in all_tags %}
+      <a href="{{ url_for('dashboard.index', tag=tag) }}" class="tag {{ 'active' if tag == active_tag else '' }}">{{ tag }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if not scenes %}
+    <div class="panel text-dim">
+      No scenes match this filter. <a href="{{ url_for('dashboard.index') }}">Clear filter</a>.
+    </div>
+  {% else %}
+    <div class="row g-3">
+      {% for scene in scenes %}
+        <div class="col-12 col-md-6 col-lg-4">
+          <a href="{{ url_for('dashboard.scene_detail', scene_token=scene.token) }}" class="scene-card">
+            <div class="scene-name">{{ scene.name }}</div>
+            <div class="scene-meta mono">{{ scene.nbr_samples }} samples</div>
+            <div class="mt-2">
+              {% for tag in scene.tags[:4] %}
+                <span class="tag">{{ tag }}</span>
+              {% endfor %}
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if total_pages > 1 %}
+    <nav class="mt-4">
+      <ul class="pagination pagination-sm">
+        {% for p in range(1, total_pages + 1) %}
+          <li class="page-item {{ 'active' if p == page else '' }}">
+            <a class="page-link" href="{{ url_for('dashboard.index', page=p, tag=active_tag) }}">{{ p }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+    {% endif %}
+  {% endif %}
+{% endblock %}

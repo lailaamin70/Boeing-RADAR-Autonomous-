@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Not found{% endblock %}
+{% block content %}
+  <h1 class="h4 mb-2">Not found</h1>
+  <p class="text-dim">That scene, sample, or file doesn't exist in this dataset version.</p>
+  <a href="{{ url_for('dashboard.index') }}">Back to scenes</a>
+{% endblock %}

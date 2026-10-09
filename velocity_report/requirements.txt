@@ -1,0 +1,28 @@
+# Python
+# Recommended: Python >=3.11,<3.12
+# truckscenes-devkit 1.2.0 does not support Python 3.12+
+
+# Core data analysis
+numpy
+pandas
+scipy
+statsmodels
+
+# Visualisation
+matplotlib
+plotly
+
+# Progress bars
+tqdm
+
+# Machine learning / robust estimation
+scikit-learn
+pyod
+
+# TruckScenes SDK
+truckscenes-devkit==1.2.0
+pyquaternion
+
+# Jupyter / VS Code notebooks
+jupyter
+ipykernel
