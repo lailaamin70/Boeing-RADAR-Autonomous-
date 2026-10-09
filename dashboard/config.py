@@ -32,7 +32,7 @@ class Config:
 
     # Object detection results:
     _DEFAULT_OMNIHD_DIR = os.path.normpath(
-        os.path.join(BASE_DIR, "..", "results", "object_detection", "omnihd")
+        os.path.join(BASE_DIR, "..", "object_detection", "results", "omnihd")
     )
     OMNIHD_RESULTS_DIR = os.environ.get("OMNIHD_RESULTS_DIR", _DEFAULT_OMNIHD_DIR)
     DETECTIONS_PATHS = {

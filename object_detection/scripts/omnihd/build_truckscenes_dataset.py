@@ -55,15 +55,15 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--metadata-version",
-        default="v1.2-mini",
-        help="TruckScenes metadata directory name (default: v1.2-mini).",
+        default="v1.2-trainval",
+        help="TruckScenes metadata directory name (default: v1.2-trainval).",
     )
     parser.add_argument(
         "--metadata-path-prefix",
         default=None,
         help=(
             "Optional portable path prefix stored inside the generated PKL, "
-            "for example data/TruckScenes_OmniHD_mini."
+            "for example data/TruckScenes_OmniHD_trainval_135."
         ),
     )
     parser.add_argument(
@@ -104,7 +104,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--info-filename",
-        default="truckscenes_omnihd_infos.pkl",
+        default="truckscenes_omnihd_trainval_135_infos.pkl",
         help="Output information-pickle filename.",
     )
     parser.add_argument(
@@ -207,6 +207,7 @@ def make_config(
             tuple(args.scene_tokens) if args.scene_tokens is not None else None
         ),
         build_all_samples=args.all_samples,
+        filter_missing_sensor_files=True,
         metadata_path_prefix=args.metadata_path_prefix,
         info_filename=args.info_filename,
         manifest_filename=args.manifest_filename,
@@ -229,6 +230,7 @@ def print_build_summary(config: BuildConfig) -> None:
     print("Output: {}".format(Path(config.output_root)))
     print("Metadata version: {}".format(config.metadata_version))
     print("Selection: {}".format(_selection_description(config)))
+    print("Require complete local LiDAR/RADAR inputs: yes")
     print("LiDAR channels: {}".format(", ".join(config.lidar_channels)))
     print("RADAR channels: {}".format(", ".join(config.radar_channels)))
     print("Reference channel: {}".format(config.reference_channel))
@@ -252,9 +254,18 @@ def print_build_summary(config: BuildConfig) -> None:
 def print_build_result(result: dict) -> None:
     """Print adapter output paths and conversion counts."""
     counts = result["counts"]
+    availability = result["availability"]
     print("Build complete")
     print("--------------")
-    print("Samples: {}".format(counts["samples"]))
+    print("Metadata scenes: {}".format(availability["metadata_scenes"]))
+    print("Metadata samples: {}".format(availability["metadata_samples"]))
+    print(
+        "Samples skipped for missing required sensor files: {}".format(
+            availability["skipped_missing_sensor_files"]
+        )
+    )
+    print("Usable local samples selected: {}".format(availability["usable_samples"]))
+    print("Samples successfully converted: {}".format(counts["samples"]))
     print("LiDAR files: {}".format(counts["lidar_files"]))
     print("LiDAR points: {}".format(counts["lidar_points"]))
     print("RADAR files: {}".format(counts["radar_files"]))
@@ -263,6 +274,7 @@ def print_build_result(result: dict) -> None:
     print("Included annotations: {}".format(counts["included_annotations"]))
     print("Excluded annotations: {}".format(counts["excluded_annotations"]))
     print()
+    print("Output dataset: {}".format(result["info_path"].parent))
     print("Info PKL: {}".format(result["info_path"]))
     print("Manifest: {}".format(result["manifest_path"]))
 

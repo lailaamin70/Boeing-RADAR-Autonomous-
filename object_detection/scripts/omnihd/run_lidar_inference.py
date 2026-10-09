@@ -1,34 +1,28 @@
 #!/usr/bin/env python3
-"""Run OmniHD PointPillars 4D RADAR inference on a converted dataset."""
+"""Run OmniHD PointPillars LiDAR inference on a converted dataset."""
 
 import argparse
 import importlib
-import importlib.machinery
-import importlib.util
 import os
 from pathlib import Path
 import pickle
 import statistics
 import sys
 import time
-import types
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
 
-MODEL_NAME = "OmniHD PointPillars 4D RADAR"
-EXPECTED_CLASSES = ("car", "pedestrian", "rider", "large_vehicle")
-RADAR_LOADER = "LoadRadarPointsMultiSweeps"
-RADAR_VOXEL_ENCODER = "PillarFeatureNetV1"
+MODEL_NAME = "OmniHD PointPillars LiDAR"
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description=(
-            "Run the official OmniHD 4D RADAR PointPillars model over a "
-            "converted TruckScenes dataset."
+            "Run the official OmniHD LiDAR PointPillars model over a converted "
+            "TruckScenes dataset."
         )
     )
     parser.add_argument(
@@ -39,27 +33,36 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--config",
         required=True,
-        help="OmniHD RADAR config; relative paths resolve from --omnihd-root.",
+        help="OmniHD LiDAR config; relative paths are resolved from --omnihd-root.",
     )
     parser.add_argument(
         "--checkpoint",
         required=True,
-        help="RADAR checkpoint; relative paths resolve from --omnihd-root.",
+        help="LiDAR checkpoint; relative paths are resolved from --omnihd-root.",
     )
     parser.add_argument(
         "--data-root",
         required=True,
-        help="Root of the converted TruckScenes dataset.",
+        help=(
+            "Root of the converted TruckScenes dataset; relative paths resolve "
+            "from the launch directory."
+        ),
     )
     parser.add_argument(
         "--ann-file",
         required=True,
-        help="Converted TruckScenes OmniHD-style annotation pickle.",
+        help=(
+            "Converted TruckScenes OmniHD-style annotation pickle; relative paths "
+            "resolve from the launch directory."
+        ),
     )
     parser.add_argument(
         "--output",
         required=True,
-        help="Destination prediction pickle.",
+        help=(
+            "Destination prediction pickle; relative paths resolve from the "
+            "launch directory."
+        ),
     )
     parser.add_argument(
         "--max-samples",
@@ -77,12 +80,13 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         "--save-every",
         type=int,
         default=50,
-        help="Atomically save after this many completed samples (default: 50).",
+        help="Atomically save progress after this many completed samples (default: 50).",
     )
     return parser.parse_args(argv)
 
 
 def _resolve_path(value: str, base: Path) -> Path:
+    """Resolve a user path after expanding ``~``."""
     path = Path(value).expanduser()
     if not path.is_absolute():
         path = base / path
@@ -90,7 +94,7 @@ def _resolve_path(value: str, base: Path) -> Path:
 
 
 def _resolve_and_validate_paths(args: argparse.Namespace) -> Dict[str, Path]:
-    """Resolve paths before changing to the external OmniHD repository."""
+    """Resolve config/checkpoint from OmniHD and other paths from launch cwd."""
     launch_directory = Path.cwd().resolve()
     omnihd_root = _resolve_path(args.omnihd_root, launch_directory)
     config = _resolve_path(args.config, omnihd_root)
@@ -104,20 +108,18 @@ def _resolve_and_validate_paths(args: argparse.Namespace) -> Dict[str, Path]:
         (data_root, "converted data root"),
     ):
         if not path.is_dir():
-            raise FileNotFoundError(
-                "{} does not exist or is not a directory: {}".format(
-                    description, path
-                )
-            )
+            raise FileNotFoundError("{} does not exist or is not a directory: {}".format(
+                description, path
+            ))
     for path, description in (
-        (config, "OmniHD RADAR config"),
-        (checkpoint, "RADAR checkpoint"),
+        (config, "OmniHD config"),
+        (checkpoint, "checkpoint"),
         (ann_file, "annotation pickle"),
     ):
         if not path.is_file():
-            raise FileNotFoundError(
-                "{} does not exist or is not a file: {}".format(description, path)
-            )
+            raise FileNotFoundError("{} does not exist or is not a file: {}".format(
+                description, path
+            ))
     if output.exists() and output.is_dir():
         raise IsADirectoryError("Output path is a directory: {}".format(output))
     if output in {config, checkpoint, ann_file}:
@@ -142,107 +144,11 @@ def _validate_range_arguments(args: argparse.Namespace) -> None:
         raise ValueError("--save-every must be greater than or equal to 1")
 
 
-def _load_source_module(module_name: str, source_path: Path) -> Any:
-    """Execute one official source module without importing a broad package."""
-    if not source_path.is_file():
-        raise FileNotFoundError("Required OmniHD source file not found: {}".format(source_path))
-    spec = importlib.util.spec_from_file_location(module_name, str(source_path))
-    if spec is None or spec.loader is None:
-        raise ImportError("Cannot create an import specification for {}".format(source_path))
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    try:
-        spec.loader.exec_module(module)
-    except BaseException:
-        sys.modules.pop(module_name, None)
-        raise
-    return module
-
-
-def _ensure_namespace_package(package_name: str, package_path: Path) -> None:
-    """Create a narrow package shell so a relative utility import can resolve."""
-    if package_name in sys.modules:
-        return
-    module = types.ModuleType(package_name)
-    module.__package__ = package_name
-    module.__path__ = [str(package_path)]
-    module.__file__ = str(package_path / "__init__.py")
-    module.__spec__ = importlib.machinery.ModuleSpec(
-        package_name, loader=None, is_package=True
-    )
-    sys.modules[package_name] = module
-
-
-def _register_radar_components(omnihd_root: Path) -> None:
-    """Register only the official RADAR loader and voxel encoder when needed."""
-    from mmdet.datasets.builder import PIPELINES
-    from mmdet3d.models.builder import VOXEL_ENCODERS
-
-    plugin_root = omnihd_root / "projects" / "mmdet3d_plugin"
-    if PIPELINES.get(RADAR_LOADER) is None:
-        loading_path = plugin_root / "datasets" / "pipelines" / "loading.py"
-        try:
-            _load_source_module("_omnihd_radar_loading_registration", loading_path)
-        except Exception as exc:
-            raise RuntimeError(
-                "Failed to register {} from {}: {}".format(
-                    RADAR_LOADER, loading_path, exc
-                )
-            ) from exc
-    if PIPELINES.get(RADAR_LOADER) is None:
-        raise RuntimeError(
-            "RADAR pipeline component {} is not registered".format(RADAR_LOADER)
-        )
-
-    if VOXEL_ENCODERS.get(RADAR_VOXEL_ENCODER) is None:
-        rcfusion_path = plugin_root / "rcfusion"
-        voxel_encoders_path = rcfusion_path / "voxel_encoders"
-        _ensure_namespace_package(
-            "projects.mmdet3d_plugin.rcfusion", rcfusion_path
-        )
-        _ensure_namespace_package(
-            "projects.mmdet3d_plugin.rcfusion.voxel_encoders",
-            voxel_encoders_path,
-        )
-        utils_module = importlib.import_module(
-            "projects.mmdet3d_plugin.rcfusion.voxel_encoders.utils"
-        )
-        # The official OmniHD pillar_encoder imports legacy
-        # PFNLayer_Radar_vod, but current utils.py does not define it.
-        # PillarFeatureNetV1 does not use this symbol; provide an in-memory
-        # compatibility alias only to allow the official module to import.
-        if not hasattr(utils_module, "PFNLayer_Radar_vod"):
-            if not hasattr(utils_module, "PFNLayer_RadarV2"):
-                raise RuntimeError(
-                    "OmniHD RADAR utils contains neither PFNLayer_Radar_vod nor "
-                    "PFNLayer_RadarV2"
-                )
-            utils_module.PFNLayer_Radar_vod = utils_module.PFNLayer_RadarV2
-
-        encoder_path = voxel_encoders_path / "pillar_encoder.py"
-        try:
-            _load_source_module(
-                "projects.mmdet3d_plugin.rcfusion.voxel_encoders.pillar_encoder",
-                encoder_path,
-            )
-        except Exception as exc:
-            raise RuntimeError(
-                "Failed to register {} from {}: {}".format(
-                    RADAR_VOXEL_ENCODER, encoder_path, exc
-                )
-            ) from exc
-    if VOXEL_ENCODERS.get(RADAR_VOXEL_ENCODER) is None:
-        raise RuntimeError(
-            "RADAR voxel encoder {} is not registered".format(RADAR_VOXEL_ENCODER)
-        )
-
-
 def _import_omnihd_dependencies(omnihd_root: Path) -> Dict[str, Any]:
-    """Import the legacy runtime and minimally register RADAR components."""
+    """Import legacy OmniHD dependencies after adding its root to ``sys.path``."""
     root_string = str(omnihd_root)
     if root_string not in sys.path:
         sys.path.insert(0, root_string)
-    os.chdir(root_string)
 
     try:
         import torch
@@ -252,15 +158,14 @@ def _import_omnihd_dependencies(omnihd_root: Path) -> Dict[str, Any]:
         from mmdet3d.datasets import build_dataloader, build_dataset
         from mmdet3d.models import build_model
 
-        # The cloud checkout uses a deliberately minimal plugin bootstrap for
-        # NewScenesDataset and CustomCollect3D. Do not restore broad imports.
         importlib.import_module("projects.mmdet3d_plugin")
+        # Explicitly import the dataset package so NewScenesDataset is
+        # registered even if a plugin __init__ changes its transitive imports.
         importlib.import_module("projects.mmdet3d_plugin.datasets")
-        _register_radar_components(omnihd_root)
     except ImportError as exc:
         raise RuntimeError(
-            "Could not import the OmniHD/MMDetection3D RADAR environment from "
-            "{}: {}".format(omnihd_root, exc)
+            "Could not import the OmniHD/MMDetection3D environment after "
+            "activating {!s}: {}".format(omnihd_root, exc)
         ) from exc
 
     return {
@@ -274,72 +179,19 @@ def _import_omnihd_dependencies(omnihd_root: Path) -> Dict[str, Any]:
     }
 
 
-def _pipeline_stages(pipeline: Sequence[Mapping[str, Any]]) -> List[Mapping[str, Any]]:
-    """Flatten configured pipeline stages, including nested augmentation stages."""
-    flattened: List[Mapping[str, Any]] = []
-    for stage in pipeline:
-        if not isinstance(stage, Mapping):
-            raise ValueError("Every test-pipeline stage must be a mapping")
-        flattened.append(stage)
-        transforms = stage.get("transforms")
-        if transforms is not None:
-            if not isinstance(transforms, (list, tuple)):
-                raise ValueError("Pipeline transforms must be a list or tuple")
-            flattened.extend(_pipeline_stages(transforms))
-    return flattened
-
-
-def _validate_radar_config(cfg: Any) -> None:
-    """Reject LiDAR or otherwise incompatible configs before construction."""
-    try:
-        encoder = cfg.model.pts_voxel_encoder
-        test_data = cfg.data.test
-        pipeline = test_data.pipeline
-        modality = test_data.modality
-    except (AttributeError, KeyError, TypeError) as exc:
-        raise ValueError(
-            "The supplied config lacks the expected OmniHD RADAR structure: {}".format(
-                exc
-            )
-        ) from exc
-
-    if encoder.get("type") != RADAR_VOXEL_ENCODER:
-        raise ValueError(
-            "RADAR config requires pts_voxel_encoder.type={!r}; found {!r}".format(
-                RADAR_VOXEL_ENCODER, encoder.get("type")
-            )
-        )
-    if encoder.get("in_channels") != 8:
-        raise ValueError(
-            "RADAR config requires pts_voxel_encoder.in_channels=8; found {!r}".format(
-                encoder.get("in_channels")
-            )
-        )
-    if not isinstance(modality, Mapping) or modality.get("use_radar") is not True:
-        raise ValueError("RADAR config test modality must set use_radar=True")
-
-    radar_stages = [
-        stage
-        for stage in _pipeline_stages(pipeline)
-        if stage.get("type") == RADAR_LOADER
-    ]
-    if not radar_stages:
-        raise ValueError(
-            "RADAR config test pipeline must contain {}".format(RADAR_LOADER)
-        )
-    loader = radar_stages[0]
-    if loader.get("load_dim") != 8:
-        raise ValueError("RADAR loader must use load_dim=8")
-    if loader.get("sweeps_num") != 3:
-        raise ValueError("RADAR loader must use sweeps_num=3")
-    if list(loader.get("use_dim", ())) != list(range(8)):
-        raise ValueError("RADAR loader must use dimensions [0, 1, 2, 3, 4, 5, 6, 7]")
+def _portable_metadata_path(path: Path, base: Optional[Path] = None) -> str:
+    """Serialize a path without exposing machine-specific absolute locations."""
+    if base is not None:
+        try:
+            return path.relative_to(base).as_posix()
+        except ValueError:
+            pass
+    return path.name
 
 
 def _prepare_config(Config: Any, paths: Dict[str, Path]) -> Any:
-    """Load, validate, and apply single-GPU overrides in memory."""
+    """Load the official config and apply the proven single-GPU overrides."""
     cfg = Config.fromfile(str(paths["config"]))
-    _validate_radar_config(cfg)
     try:
         cfg.data.test.with_velocity = False
         cfg.data.test.test_mode = True
@@ -361,31 +213,10 @@ def _prepare_config(Config: Any, paths: Dict[str, Path]) -> Any:
         cfg.model.train_cfg = None
     except (AttributeError, KeyError, TypeError) as exc:
         raise ValueError(
-            "Could not apply OmniHD RADAR single-GPU overrides: {}".format(exc)
+            "The supplied config does not have the expected OmniHD LiDAR "
+            "PointPillars structure: {}".format(exc)
         ) from exc
     return cfg
-
-
-def _validate_dataset_metadata(dataset: Any) -> None:
-    """Check RADAR metadata for every sample without loading point files."""
-    data_infos = getattr(dataset, "data_infos", None)
-    if not isinstance(data_infos, list) or len(data_infos) != len(dataset):
-        raise ValueError("Dataset must expose one data_infos record per sample")
-    for index, info in enumerate(data_infos):
-        if not isinstance(info, Mapping):
-            raise ValueError("dataset.data_infos[{}] must be a mapping".format(index))
-        token = info.get("token")
-        if not isinstance(token, str) or not token:
-            raise ValueError(
-                "dataset.data_infos[{}] has no valid token".format(index)
-            )
-        radars = info.get("radars")
-        if not isinstance(radars, Mapping) or not radars:
-            raise ValueError(
-                "dataset.data_infos[{}] token={} has no RADAR metadata".format(
-                    index, token
-                )
-            )
 
 
 def _to_numpy(value: Any, name: str) -> np.ndarray:
@@ -403,7 +234,7 @@ def _to_numpy(value: Any, name: str) -> np.ndarray:
 
 
 def _extract_prediction(result: Any) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Extract arrays from either supported OmniHD prediction layout."""
+    """Extract serializable arrays from either supported OmniHD result layout."""
     if isinstance(result, (list, tuple)):
         if not result:
             raise ValueError("Model returned an empty result sequence")
@@ -431,6 +262,7 @@ def _extract_prediction(result: Any) -> Tuple[np.ndarray, np.ndarray, np.ndarray
     boxes = _to_numpy(boxes_value, "boxes_3d")
     scores = _to_numpy(prediction["scores_3d"], "scores_3d").reshape(-1)
     labels = _to_numpy(prediction["labels_3d"], "labels_3d").reshape(-1)
+
     if boxes.ndim != 2:
         raise ValueError("boxes_3d must be a two-dimensional array")
     if boxes.shape[0] != scores.shape[0] or scores.shape[0] != labels.shape[0]:
@@ -470,13 +302,17 @@ def _build_output(
     return {
         "metadata": {
             "model": MODEL_NAME,
-            "modality": "radar",
+            "modality": "lidar",
             "classes": list(classes),
-            "omnihd_root": str(paths["omnihd_root"]),
-            "config": str(paths["config"]),
-            "checkpoint": str(paths["checkpoint"]),
-            "data_root": str(paths["data_root"]),
-            "ann_file": str(paths["ann_file"]),
+            "omnihd_root": "OmniHD-Scenes",
+            "config": _portable_metadata_path(
+                paths["config"], paths["omnihd_root"]
+            ),
+            "checkpoint": _portable_metadata_path(
+                paths["checkpoint"], paths["omnihd_root"]
+            ),
+            "data_root": _portable_metadata_path(paths["data_root"]),
+            "ann_file": _portable_metadata_path(paths["ann_file"]),
             "gpu": gpu_name,
             "torch_version": torch_version,
             "cuda_runtime": cuda_runtime,
@@ -492,6 +328,7 @@ def _build_output(
 
 
 def _atomic_pickle_dump(payload: Dict[str, Any], destination: Path) -> None:
+    """Write a pickle beside its destination and atomically replace the target."""
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(destination.name + ".tmp")
     try:
@@ -507,13 +344,14 @@ def _atomic_pickle_dump(payload: Dict[str, Any], destination: Path) -> None:
 
 
 def run(args: argparse.Namespace) -> int:
-    """Configure OmniHD, run the selected range, and save RADAR predictions."""
+    """Configure OmniHD, run the selected dataset range, and save predictions."""
     _validate_range_arguments(args)
     paths = _resolve_and_validate_paths(args)
     dependencies = _import_omnihd_dependencies(paths["omnihd_root"])
     torch = dependencies["torch"]
+
     if not torch.cuda.is_available():
-        raise RuntimeError("CUDA is unavailable; OmniHD RADAR inference requires a GPU")
+        raise RuntimeError("CUDA is unavailable; OmniHD LiDAR inference requires a GPU")
     torch.cuda.set_device(0)
 
     cfg = _prepare_config(dependencies["Config"], paths)
@@ -521,7 +359,6 @@ def run(args: argparse.Namespace) -> int:
     dataset_samples = len(dataset)
     if dataset_samples == 0:
         raise ValueError("The supplied annotation pickle produced an empty dataset")
-    _validate_dataset_metadata(dataset)
     if args.start_index >= dataset_samples:
         raise ValueError(
             "--start-index {} is outside a dataset with {} samples".format(
@@ -548,6 +385,7 @@ def run(args: argparse.Namespace) -> int:
         dist=False,
         shuffle=False,
     )
+
     model = dependencies["build_model"](
         cfg.model, test_cfg=cfg.get("test_cfg")
     )
@@ -559,18 +397,13 @@ def run(args: argparse.Namespace) -> int:
         model.CLASSES = checkpoint_meta["CLASSES"]
     else:
         model.CLASSES = dataset.CLASSES
-    classes = [str(name) for name in model.CLASSES]
-    if classes != list(EXPECTED_CLASSES):
-        raise ValueError(
-            "Model classes are {}, expected {}".format(
-                classes, list(EXPECTED_CLASSES)
-            )
-        )
 
     model = dependencies["MMDataParallel"](
         model.cuda(), device_ids=[0]
     )
     model.eval()
+
+    classes = [str(name) for name in model.module.CLASSES]
     gpu_name = str(torch.cuda.get_device_name(0))
     torch_version = str(torch.__version__)
     cuda_runtime = None if torch.version.cuda is None else str(torch.version.cuda)
@@ -598,7 +431,12 @@ def run(args: argparse.Namespace) -> int:
                 continue
             if sample_index >= stop_index:
                 break
+
             info = dataset.data_infos[sample_index]
+            if "token" not in info:
+                raise KeyError(
+                    "dataset.data_infos[{}] has no token".format(sample_index)
+                )
             sample_token = str(info["token"])
 
             torch.cuda.synchronize()

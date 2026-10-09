@@ -17,3 +17,7 @@ data/
 # OS/editor files
 .DS_Store
 Thumbs.db
+
+# Full object-detection prediction artifacts
+object_detection/results/omnihd/lidar_trainval_135_predictions.pkl
+object_detection/results/omnihd/radar_trainval_135_predictions.pkl
