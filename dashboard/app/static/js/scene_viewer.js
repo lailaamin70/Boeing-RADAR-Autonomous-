@@ -18,6 +18,7 @@ const els = {
   cameraCol: document.getElementById("camera-col"),
   cameraSelect: document.getElementById("camera-select"),
   mainTitle: document.getElementById("main-view-title"),
+  showEgo: document.getElementById("show-ego"),
   showDetections: document.getElementById("show-detections"),
   scoreWrap: document.getElementById("score-threshold-wrap"),
   scoreSlider: document.getElementById("score-threshold"),
@@ -31,6 +32,12 @@ let scoreTouched = false;
 const MODALITY_COLOR = { radar: "#e2793d", lidar: "#4bb4c4" };
 const ANNOTATION_COLOR = "#f2e5c9";
 const DETECTION_COLOR = { radar: "#ff4d8d", lidar: "#c6ff4d" };
+const EGO_COLOR = "#8b93a3";
+const SENSOR_STYLE = {
+  radar: { color: "#e2793d", symbol: "square" },
+  lidar: { color: "#4bb4c4", symbol: "diamond" },
+  camera: { color: "#7f9fd9", symbol: "circle" },
+};
 
 // Box edges: 0-3 front face, 4-7 rear face
 const BOX_EDGES = [
@@ -38,6 +45,13 @@ const BOX_EDGES = [
   [4, 5], [5, 6], [6, 7], [7, 4],
   [0, 4], [1, 5], [2, 6], [3, 7],
 ];
+
+// 12 triangles covering the 6 faces of a box used for the ego-truck body.
+const BOX_TRIANGLES = {
+  i: [0, 0, 4, 4, 0, 0, 3, 3, 0, 0, 1, 1],
+  j: [1, 2, 5, 6, 1, 5, 2, 6, 3, 7, 2, 6],
+  k: [2, 3, 6, 7, 5, 4, 6, 7, 7, 4, 6, 5],
+};
 
 function selectedSensors() {
   return Array.from(document.querySelectorAll(".sensor-check"))
@@ -53,6 +67,10 @@ function showAnnotations() {
   return document.getElementById("show-annotations").checked;
 }
 
+function showEgo() {
+  return els.showEgo.checked;
+}
+
 function showDetections() {
   return els.showDetections.checked;
 }
@@ -65,8 +83,9 @@ function mediaUrl(filename) {
   return window.SCENE_ENDPOINTS.media.replace("__FILE__", filename);
 }
 
-function withParams(base, sensors, annotations, detections, minScore) {
+function withParams(base, sensors, annotations, detections, minScore, ego = false) {
   const params = new URLSearchParams();
+  if (ego) params.set("ego", "1");
   sensors.forEach((s) => params.append("sensor", s));
   if (annotations) params.set("annotations", "1");
   if (detections) {
@@ -76,17 +95,17 @@ function withParams(base, sensors, annotations, detections, minScore) {
   return `${base}?${params.toString()}`;
 }
 
-function topdownUrl(token, sensors, annotations, detections, minScore) {
+function topdownUrl(token, sensors, annotations, detections, minScore, ego) {
   return withParams(
     window.SCENE_ENDPOINTS.topdown.replace("__TOKEN__", token),
-    sensors, annotations, detections, minScore
+    sensors, annotations, detections, minScore, ego
   );
 }
 
-function pointsUrl(token, sensors, annotations, detections, minScore) {
+function pointsUrl(token, sensors, annotations, detections, minScore, ego) {
   return withParams(
     window.SCENE_ENDPOINTS.points.replace("__TOKEN__", token),
-    sensors, annotations, detections, minScore
+    sensors, annotations, detections, minScore, ego
   );
 }
 
@@ -110,7 +129,55 @@ function addBoxTrace(traces, box, { color, dash, width, name, legendgroup, showl
   });
 }
 
-async function render3D(sample, sensors, annotations, detections, minScore) {
+function addEgoTraces(traces, ego) {
+  if (!ego) return;
+
+  ego.boxes.forEach((box, i) => {
+    const c = box.corners;
+    traces.push({
+      type: "mesh3d",
+      x: c.map((p) => p[0]),
+      y: c.map((p) => p[1]),
+      z: c.map((p) => p[2]),
+      i: BOX_TRIANGLES.i,
+      j: BOX_TRIANGLES.j,
+      k: BOX_TRIANGLES.k,
+      color: EGO_COLOR,
+      opacity: 0.18,
+      flatshading: true,
+      name: "ego truck",
+      legendgroup: "ego",
+      showlegend: i === 0,
+      hoverinfo: "skip",
+    });
+    addBoxTrace(traces, box, {
+      color: EGO_COLOR, dash: "solid", width: 2,
+      name: box.name, legendgroup: "ego", showlegend: false,
+    });
+  });
+
+  const byModality = {};
+  ego.sensors.forEach((s) => {
+    if (!byModality[s.modality]) byModality[s.modality] = [];
+    byModality[s.modality].push(s);
+  });
+  Object.entries(byModality).forEach(([modality, list]) => {
+    const style = SENSOR_STYLE[modality] || { color: "#ffffff", symbol: "circle" };
+    traces.push({
+      type: "scatter3d",
+      mode: "markers",
+      name: `${modality} sensors`,
+      x: list.map((s) => s.xyz[0]),
+      y: list.map((s) => s.xyz[1]),
+      z: list.map((s) => s.xyz[2]),
+      text: list.map((s) => s.channel),
+      hovertemplate: "%{text}<extra></extra>",
+      marker: { size: 5, color: style.color, symbol: style.symbol, line: { color: "#ffffff", width: 1 } },
+    });
+  });
+}
+
+async function render3D(sample, sensors, annotations, detections, minScore, ego) {
   if (sensors.length === 0) {
     Plotly.purge(els.plot3dWrap);
     return;
@@ -118,7 +185,7 @@ async function render3D(sample, sensors, annotations, detections, minScore) {
 
   let data;
   try {
-    const res = await fetch(pointsUrl(sample.token, sensors, annotations, detections, minScore));
+    const res = await fetch(pointsUrl(sample.token, sensors, annotations, detections, minScore, ego));
     data = await res.json();
   } catch (err) {
     els.plot3dWrap.innerHTML = `<div class="text-dim p-3">Couldn't load points: ${err.message}</div>`;
@@ -134,6 +201,8 @@ async function render3D(sample, sensors, annotations, detections, minScore) {
     z: pts.z,
     marker: { size: 1.5, color: MODALITY_COLOR[modality] || "#888", opacity: 0.7 },
   }));
+
+  addEgoTraces(traces, data.ego);
 
   (data.annotations || []).forEach((box, i) => {
     addBoxTrace(traces, box, {
@@ -165,11 +234,13 @@ async function render3D(sample, sensors, annotations, detections, minScore) {
     plot_bgcolor: "#1a2029",
     font: { color: "#dde3ea" },
     margin: { l: 0, r: 0, t: 10, b: 0 },
+    uirevision: "scene-viewer-3d",
     scene: {
       xaxis: { title: "x (m)", color: "#8b93a3", gridcolor: "#2a3140" },
       yaxis: { title: "y (m)", color: "#8b93a3", gridcolor: "#2a3140" },
       zaxis: { title: "z (m)", color: "#8b93a3", gridcolor: "#2a3140" },
       aspectmode: "data",
+      uirevision: "scene-viewer-3d",
     },
     legend: { font: { color: "#dde3ea" } },
     showlegend: true,
@@ -249,6 +320,7 @@ function updateFrame() {
   const annotations = showAnnotations();
   const detections = showDetections();
   const minScore = scoreThreshold();
+  const ego = showEgo();
   const mode = viewMode();
 
   els.scoreWrap.style.display = detections ? "" : "none";
@@ -259,13 +331,13 @@ function updateFrame() {
     els.topdownWrap.style.display = "";
     els.plot3dWrap.style.display = "none";
     els.topdownImg.src = sensors.length
-      ? topdownUrl(sample.token, sensors, annotations, detections, minScore)
+      ? topdownUrl(sample.token, sensors, annotations, detections, minScore, ego)
       : "";
   } else {
     els.mainTitle.textContent = "3D";
     els.topdownWrap.style.display = "none";
     els.plot3dWrap.style.display = "";
-    render3D(sample, sensors, annotations, detections, minScore);
+    render3D(sample, sensors, annotations, detections, minScore, ego);
   }
 
   updateCamera(sample, sensors, annotations, detections, minScore);
@@ -289,14 +361,12 @@ function startPlayback() {
 
   playing = true;
   els.playBtn.textContent = "Pause";
-
   const tick = () => {
     if (!playing) return;
     if (frameIndex >= samples.length - 1) {
       stopPlayback();
       return;
     }
-
     stepFrame(1);
     playTimer = setTimeout(tick, Number(els.speed.value));
   };
@@ -318,6 +388,7 @@ els.slider.addEventListener("input", (e) => {
 document.querySelectorAll('input[name="view_mode"]').forEach((el) => el.addEventListener("change", updateFrame));
 document.querySelectorAll(".sensor-check").forEach((el) => el.addEventListener("change", updateFrame));
 document.getElementById("show-annotations").addEventListener("change", updateFrame);
+els.showEgo.addEventListener("change", updateFrame);
 els.showDetections.addEventListener("change", updateFrame);
 els.scoreSlider.addEventListener("input", () => {
   scoreTouched = true;

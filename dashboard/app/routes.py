@@ -10,6 +10,7 @@ bp = Blueprint("dashboard", __name__)
 
 VALID_SENSORS = ("radar", "lidar")
 
+
 @bp.route("/")
 def index():
     """Scene list, with optional tag filter and simple pagination."""
@@ -195,10 +196,11 @@ def sample_topdown(sample_token):
     sensors = _parse_sensors(request.args)
     show_annotations = request.args.get("annotations") == "1"
     show_detections = request.args.get("detections") == "1"
+    show_ego = request.args.get("ego") == "1"
     min_score = _parse_min_score(request.args)
     try:
         buf = scene_viewer.render_topdown_png(
-            sample_token, sensors, show_annotations, show_detections, min_score
+            sample_token, sensors, show_annotations, show_detections, min_score, show_ego=show_ego
         )
     except KeyError:
         abort(404)
@@ -211,10 +213,11 @@ def sample_points(sample_token):
     sensors = _parse_sensors(request.args)
     show_annotations = request.args.get("annotations") == "1"
     show_detections = request.args.get("detections") == "1"
+    show_ego = request.args.get("ego") == "1"
     min_score = _parse_min_score(request.args)
     try:
         data = scene_viewer.get_points_payload(
-            sample_token, sensors, show_annotations, show_detections, min_score
+            sample_token, sensors, show_annotations, show_detections, min_score, show_ego=show_ego
         )
     except KeyError:
         abort(404)

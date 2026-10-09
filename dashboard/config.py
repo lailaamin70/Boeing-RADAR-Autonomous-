@@ -12,7 +12,7 @@ class Config:
     TRUCKSCENES_DATAROOT = os.environ.get(
         "TRUCKSCENES_DATAROOT", _DEFAULT_DATAROOT
     )
-    # Which split to load: v1.0-mini, v1.0-trainval, v1.0-test
+    # Which split to load, e.g. v1.2-mini (must match a folder under the dataroot)
     TRUCKSCENES_VERSION = os.environ.get("TRUCKSCENES_VERSION", "v1.2-mini")
 
     TRUCKSCENES_VERBOSE = True
@@ -21,6 +21,7 @@ class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-key-change-me")
     JSON_SORT_KEYS = False
 
+    # How many scenes / samples to show per page on listing views
     SCENES_PER_PAGE = 12
     SAMPLES_PER_PAGE = 20
 
@@ -29,6 +30,11 @@ class Config:
         "ANALYSIS_CACHE_PATH",
         os.path.join(BASE_DIR, "instance", "analysis_expensive_cache.json"),
     )
+
+    # Ego truck outline (scene viewer):
+    EGO_TRUCK_BOXES = [
+        {"name": "tractor", "center": [1.9, 0.0, 1.9], "size": [2.55, 6.5, 3.8]},
+    ]
 
     # Object detection results:
     _DEFAULT_OMNIHD_DIR = os.path.normpath(
