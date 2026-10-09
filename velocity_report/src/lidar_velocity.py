@@ -1,16 +1,14 @@
 """
-LiDAR information and velocity-processing utilities for the TruckScenes project.
-This module contains reusable LiDAR processing functions developed and validated in 04_lidar.ipynb.
-The workflow loads LiDAR point-level data, constructs target-level LiDAR information, builds LiDAR-derived target states, and estimates target velocity from consecutive same-sensor observations.
-The LiDAR-derived velocity is an estimated motion quantity and is not a direct velocity field provided by the LiDAR sensor.
+Utilities for processing TruckScenes LiDAR data and estimating target velocities.
+
+Target positions are estimated from LiDAR points, and velocities are
+calculated from position changes between consecutive observations
+rather than measured directly by the LiDAR sensor.
 """
 
 from pathlib import Path
-
 import pandas as pd
-
 from collections import defaultdict
-
 import numpy as np
 
 from pyquaternion import Quaternion
@@ -22,19 +20,7 @@ from truckscenes.utils.geometry_utils import points_in_box
 
 
 def load_lidar_points(pcd_file):
-    """
-    Load point-level data from a TruckScenes LiDAR PCD file.
-
-    Parameters
-    ----------
-    pcd_file : str or Path
-        Path to a TruckScenes LiDAR PCD file.
-
-    Returns
-    -------
-    pandas.DataFrame
-        LiDAR point-level measurements. Each row represents one LiDAR point.
-    """
+    """Load LiDAR point coordinates, intensity, and timestamps from a PCD file."""
 
     pcd_file = Path(pcd_file)
 
@@ -58,32 +44,13 @@ def load_lidar_points(pcd_file):
 
     return points_df
 
+
 def build_target_lidar_information_df(
     annotations,
     instances,
     categories,
 ):
-    """
-    Build target-level LiDAR information from TruckScenes annotations.
-
-    Each row represents one annotated target vehicle at one keyframe.
-
-    Parameters
-    ----------
-    annotations : list
-        Records loaded from sample_annotation.json.
-
-    instances : list
-        Records loaded from instance.json.
-
-    categories : list
-        Records loaded from category.json.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Target-level LiDAR information containing target identity, category, sample linkage, and the dataset-provided `num_lidar_pts` count.
-    """
+    """Build vehicle-level LiDAR information using annotation point counts."""
 
     instance_lookup = {
         record["token"]: record
@@ -121,6 +88,7 @@ def build_target_lidar_information_df(
 
     return pd.DataFrame(records)
 
+
 def build_lidar_target_states_df(
     target_lidar_df,
     annotations,
@@ -131,37 +99,10 @@ def build_lidar_target_states_df(
     sensor_root,
 ):
     """
-    Build LiDAR-derived target states at keyframes.
-    Each row represents one target vehicle observed by one LiDAR sensor at one keyframe.
-    Target annotation boxes are used only for point association. Target position is estimated from the mean global position of the associated LiDAR points.
+    Estimate target positions from LiDAR points at each keyframe.
 
-    Parameters
-    ----------
-    target_lidar_df : pandas.DataFrame
-        Target-level vehicle information containing annotation and sample tokens.
-
-    annotations : list
-        Records loaded from sample_annotation.json.
-
-    lidar_observation_df : pandas.DataFrame
-        LiDAR keyframe observation table.
-
-    sample_data_lookup : dict
-        Lookup from sample_data token to metadata record.
-
-    ego_pose_lookup : dict
-        Lookup from ego-pose token to metadata record.
-
-    calibrated_sensor_lookup : dict
-        Lookup from calibrated-sensor token to metadata record.
-
-    sensor_root : str or Path
-        Root directory containing TruckScenes sensor files.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per target, LiDAR sensor, and keyframe, containing target-associated point count, median point timestamp, and LiDAR-derived mean target position in global coordinates.
+    Points are transformed to global coordinates and associated with
+    annotation boxes to calculate target positions.
     """
 
     annotation_lookup = {
@@ -310,32 +251,18 @@ def build_lidar_target_states_df(
 
     return pd.DataFrame(records)
 
+
 def build_lidar_velocity_df(
     lidar_target_states_df,
     annotations,
     min_points=20,
 ):
     """
-    Build LiDAR-derived target velocity intervals.
-    Consecutive target states from the same LiDAR sensor are paired using annotation trajectory linkage.
-    A sensor-level interval is retained only when both observations contain at least the required number of target-associated LiDAR points.
-    If multiple LiDAR sensors provide valid estimates for the same target interval, the sensor with the largest minimum point count is selected.
+    Estimate target velocities from consecutive LiDAR observations.
 
-    Parameters
-    ----------
-    lidar_target_states_df : pandas.DataFrame
-        LiDAR-derived target states at individual keyframes.
-
-    annotations : list
-        Records loaded from sample_annotation.json.
-
-    min_points : int, optional
-        Minimum target-associated point count required at both observations. Default is 20.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per LiDAR-derived target velocity interval.
+    Only same-sensor observations meeting the minimum point count are used.
+    When multiple sensors are available, the estimate with the highest
+    minimum point count is selected.
     """
 
     annotation_next = {

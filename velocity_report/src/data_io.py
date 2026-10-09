@@ -1,32 +1,16 @@
 """
-Basic data-loading utilities for the TruckScenes analysis project.
-This module contains reusable functions for reading TruckScenes files.
+Utilities for reading TruckScenes data files.
 
-The functions in this file should only handle data input and basic parsing.
-Dataset analysis, velocity calculation, sensor comparison, and other research logic should be implemented in separate modules.
-
-These functions are designed to work with both the mini dataset and the complete TruckScenes dataset because file locations are passed to the functions rather than hard-coded here.
+Provides functions for loading JSON metadata and reading PCD file
+headers without loading the point-cloud data.
 """
 
 from pathlib import Path
 import json
 
 
-# JSON loading
 def load_json(file_path):
-    """
-    Load a JSON file and return its contents.
-
-    Parameters
-    ----------
-    file_path : str or Path
-        Path to the JSON file.
-
-    Returns
-    -------
-    dict or list
-        Parsed JSON content.
-    """
+    """Load and parse a JSON file."""
 
     file_path = Path(file_path)
 
@@ -34,21 +18,10 @@ def load_json(file_path):
         return json.load(f)
 
 
-# PCD header loading
 def read_pcd_header(pcd_file):
     """
-    Read the header of a PCD file without loading the point-cloud data.
-
-    Parameters
-    ----------
-    pcd_file : str or Path
-        Path to the PCD file.
-
-    Returns
-    -------
-    dict
-        PCD header information including fields, size, type,
-        dimensions, point count, and data format.
+    Read PCD header information without loading point-cloud data.
+    Extracts fields, data types, dimensions, point count, and data format.
     """
 
     pcd_file = Path(pcd_file)

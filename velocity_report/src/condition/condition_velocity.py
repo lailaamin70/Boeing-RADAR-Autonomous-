@@ -1,16 +1,8 @@
 """
-Reusable utilities for condition-based RADAR-LiDAR velocity analysis.
+Utilities for condition-based RADAR/LiDAR velocity analysis.
 
-The input DataFrame should already contain the condition column to be analysed
-(e.g. area, weather, visibility, object_type, or distance).
-
-The analysis separates:
-- RADAR reconstruction availability
-- RADAR numerical stability
-- LiDAR velocity availability
-- paired RADAR-LiDAR availability
-- speed and direction accuracy
-- speed-error outliers
+Calculates velocity availability, speed and direction errors,
+and speed-error outliers across different operating conditions.
 """
 
 import numpy as np
@@ -157,27 +149,10 @@ def error_summary(
     outlier_threshold=3.5,
 ):
     """
-    Summarise speed and direction accuracy for each condition value.
+    Summarise speed and direction errors for each condition.
 
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Interval-level condition analysis table.
-
-    tag : str
-        Condition column used for grouping.
-
-    both_sensors_only : bool
-        If True, RADAR and LiDAR are evaluated only on intervals where
-        stable RADAR and valid LiDAR velocities are both available.
-
-    outlier_threshold : float
-        Modified z-score threshold used by the PyOD MAD detector.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Summary of speed error, direction error, and outlier frequency.
+    Supports both paired-sensor and individual-sensor comparisons,
+    including speed-error outlier statistics.
     """
     if both_sensors_only:
         df = df[df["paired_available"]].copy()

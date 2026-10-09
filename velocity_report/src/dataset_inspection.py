@@ -1,15 +1,8 @@
 """
-Dataset-inspection utilities for the TruckScenes project.
+Utilities for inspecting TruckScenes sensor files and metadata.
 
-This module provides functions for:
-- inspecting RADAR and LiDAR sensor channels
-- checking PCD field structures and point counts
-- inspecting metadata JSON structures
-- checking sensor-file consistency
-
-Dataset paths are obtained from config.py by default.
-The same functions can be used with the mini or full TruckScenes dataset
-by changing the dataset configuration.
+Includes sensor channel inspection, PCD header analysis,
+point-count statistics, and metadata structure checks.
 """
 
 from pathlib import Path
@@ -20,29 +13,14 @@ from .config import SAMPLES_ROOT, METADATA_ROOT
 from .data_io import load_json, read_pcd_header
 
 
-# Sensor structure
 def get_sensor_structure(samples_root=None):
-    """
-    Inspect available RADAR and LiDAR sensor channels.
+    """List RADAR and LiDAR sensor channels and count their PCD files."""
 
-    Parameters
-    ----------
-    samples_root : str or Path, optional
-        Path to the TruckScenes samples directory. If None, SAMPLES_ROOT from config.py is used.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Sensor modality, channel name, and number of sample PCD files.
-    """
-
-    # Use the path defined in config.py unless another path is provided
     if samples_root is None:
         samples_root = SAMPLES_ROOT
 
     samples_root = Path(samples_root)
 
-    # Check whether the samples directory exists
     if not samples_root.exists():
         raise FileNotFoundError(
             f"Samples directory not found: {samples_root}"
@@ -79,7 +57,6 @@ def get_sensor_structure(samples_root=None):
             "Number_of_PCD_Files": len(pcd_files),
         })
 
-    # Avoid silently returning an empty DataFrame
     if not records:
         raise ValueError(
             f"No RADAR or LiDAR sensor folders were found in: {samples_root}"
@@ -88,29 +65,14 @@ def get_sensor_structure(samples_root=None):
     return pd.DataFrame(records)
 
 
-# PCD inspection
 def inspect_pcd_files(samples_root=None):
-    """
-    Inspect RADAR and LiDAR PCD file headers.
+    """Read RADAR and LiDAR PCD headers to inspect file structure and point counts."""
 
-    Parameters
-    ----------
-    samples_root : str or Path, optional
-        Path to the TruckScenes samples directory. If None, SAMPLES_ROOT from config.py is used.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per PCD file containing sensor information, field structure, point count, and data format.
-    """
-
-    # Use the path defined in config.py unless another path is provided
     if samples_root is None:
         samples_root = SAMPLES_ROOT
 
     samples_root = Path(samples_root)
 
-    # Check whether the samples directory exists
     if not samples_root.exists():
         raise FileNotFoundError(
             f"Samples directory not found: {samples_root}"
@@ -167,20 +129,9 @@ def inspect_pcd_files(samples_root=None):
 
     return pd.DataFrame(records)
 
+
 def get_field_consistency(pcd_df):
-    """
-    Summarise PCD field and data-format consistency by sensor.
-
-    Parameters
-    ----------
-    pcd_df : pandas.DataFrame
-        PCD inspection table produced by inspect_pcd_files().
-
-    Returns
-    -------
-    pandas.DataFrame
-        Summary of field structures and data formats for each sensor.
-    """
+    """Summarise PCD field structures and data formats for each sensor."""
 
     required_columns = {
         "Modality",
@@ -233,23 +184,9 @@ def get_field_consistency(pcd_df):
 
     return summary
 
+
 def get_point_summary(pcd_df):
-    """
-    Summarise point-count statistics for RADAR and LiDAR PCD files.
-
-    Parameters
-    ----------
-    pcd_df : pandas.DataFrame
-        PCD inspection table produced by inspect_pcd_files().
-
-    Returns
-    -------
-    modality_summary : pandas.DataFrame
-        Point-count statistics by sensor modality.
-
-    sensor_summary : pandas.DataFrame
-        Point-count statistics by sensor channel.
-    """
+    """Calculate point-count statistics by sensor type and channel."""
 
     required_columns = {
         "Modality",
@@ -271,8 +208,7 @@ def get_point_summary(pcd_df):
             "pcd_df is empty. No PCD files are available for analysis."
         )
 
-    # Ensure point counts are numeric.
-    # Invalid or missing values become NaN.
+    # Ensure point counts are numeric. Invalid or missing values become NaN.
     data = pcd_df.copy()
 
     data["Points"] = pd.to_numeric(
@@ -311,23 +247,10 @@ def get_point_summary(pcd_df):
     return modality_summary, sensor_summary
 
 
-# Metadata inspection
 def inspect_metadata_structure(metadata_root=None):
     """
-    Inspect metadata JSON structures in the TruckScenes dataset.
-
-    Parameters
-    ----------
-    metadata_root : str or Path, optional
-        Path to the metadata directory. If None, METADATA_ROOT from config.py is used.
-
-    Returns
-    -------
-    metadata_summary : pandas.DataFrame
-        Structure summary for each metadata JSON file.
-
-    field_summary : pandas.DataFrame
-        Field availability summary for each metadata JSON file.
+    Inspect JSON metadata structure and field availability.
+    Checks field consistency across records in each metadata file.
     """
 
     if metadata_root is None:
@@ -408,7 +331,6 @@ def inspect_metadata_structure(metadata_root=None):
             })
             continue
 
-        # Make sure records are dictionary-like
         dict_records = [
             record
             for record in records
@@ -428,7 +350,6 @@ def inspect_metadata_structure(metadata_root=None):
             })
             continue
 
-        # Discover every field that actually exists
         all_fields = sorted(
             set().union(
                 *(record.keys() for record in dict_records)
@@ -462,7 +383,6 @@ def inspect_metadata_structure(metadata_root=None):
             "Error": "",
         })
 
-        # Detailed field availability
         for field in all_fields:
 
             present_count = sum(

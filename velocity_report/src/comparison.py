@@ -1,7 +1,8 @@
 """
-Reusable velocity-comparison utilities for the TruckScenes project.
-Validated in 05_Velocity_Comparison.ipynb.
-This module builds the common RADAR-LiDAR comparison table from already processed reference, RADAR, and LiDAR results.
+Utilities for comparing RADAR and LiDAR velocity estimates.
+
+This module combines reference velocities, sensor estimates,
+and observation information for cross-sensor comparison.
 """
 
 import pandas as pd
@@ -15,7 +16,7 @@ SPEED_LABELS_KMH = [
 
 
 def _require_columns(df, required, name):
-    """Check that required DataFrame columns are present."""
+    """Check that the required DataFrame columns exist."""
     missing = set(required) - set(df.columns)
     if missing:
         raise ValueError(
@@ -25,7 +26,7 @@ def _require_columns(df, required, name):
 
 
 def _require_unique(df, keys, name):
-    """Check that the intended join key is unique."""
+    """Check for duplicate values in the specified key columns."""
     if df.duplicated(subset=keys).any():
         raise ValueError(
             f"{name} contains duplicate rows for key: "
@@ -39,9 +40,9 @@ def build_velocity_comparison_df(
     lidar_velocity_df,
 ):
     """
-    Build the common interval-level velocity comparison table.
-    Each row represents one valid annotation-derived reference interval.
-    RADAR and LiDAR velocity results are left-joined so unavailable estimates are retained.
+    Combine reference, RADAR, and LiDAR velocities into a comparison table.
+    Each row represents a reference interval, including intervals
+    without available sensor velocity estimates.
     """
 
     interval_key = ["start_annotation_token", "end_annotation_token"]
@@ -96,9 +97,7 @@ def add_sensor_information(
     target_radar_df,
     target_lidar_df,
 ):
-    """
-    Add interval-level RADAR and LiDAR target-information metrics.
-    """
+    """Add RADAR and LiDAR observation counts and availability flags."""
 
     _require_columns(
         comparison_df,
@@ -197,7 +196,7 @@ def add_sensor_information(
 
 
 def add_speed_ranges(comparison_df):
-    """Add reference speed in km/h and the common speed-range labels."""
+    """Group reference speeds into predefined km/h ranges."""
 
     _require_columns(comparison_df, {"speed_2d_mps"}, "comparison_df")
 

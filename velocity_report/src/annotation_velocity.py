@@ -1,20 +1,8 @@
 """
-Annotation-derived reference velocity utilities for the TruckScenes project.
+Calculate annotation-based reference velocities from TruckScenes metadata.
 
-This module contains reusable functions developed and validated in 02_Annotation_Reference_Velocity.ipynb.
-
-The workflow derives object motion from consecutive TruckScenes annotations by linking object annotations to sample timestamps and constructing consecutive annotation pairs.
-
-The module provides functions for:
-- constructing annotation trajectory tables
-- building consecutive annotation pairs
-- calculating annotation time differences
-- calculating 2D and 3D position changes
-- calculating 2D and 3D annotation-derived reference velocity
-
-The 2D ground-plane speed is used as the primary vehicle reference velocity, while the 3D speed is retained for diagnostic comparison.
-
-RADAR measurements, LiDAR measurements, vehicle-speed grouping, and sensor comparison logic are handled separately.
+The module uses consecutive object annotations to calculate 2D and 3D
+velocities. The 2D ground-plane speed is used as the main reference.
 """
 
 import pandas as pd
@@ -26,30 +14,7 @@ def build_annotation_trajectory_df(
     instances,
     categories,
 ):
-    """
-    Build an annotation trajectory table from TruckScenes metadata.
-    Each row represents one object annotation at one sample keyframe.
-
-    Parameters
-    ----------
-    samples : list
-        Records loaded from sample.json.
-
-    annotations : list
-        Records loaded from sample_annotation.json.
-
-    instances : list
-        Records loaded from instance.json.
-
-    categories : list
-        Records loaded from category.json.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Annotation trajectory table containing object identity,
-        timestamp, position, trajectory links, and category.
-    """
+    """Build an annotation trajectory table from TruckScenes metadata."""
 
     sample_timestamp = {
         sample["token"]: sample["timestamp"]
@@ -117,21 +82,9 @@ def build_annotation_trajectory_df(
 
     return pd.DataFrame(records)
 
+
 def build_annotation_pairs(trajectory_df):
-    """
-    Build consecutive annotation pairs using annotation `next` links.
-    Each row represents one motion interval between two consecutive annotations of the same object instance.
-
-    Parameters
-    ----------
-    trajectory_df : pandas.DataFrame
-        Annotation trajectory table produced by build_annotation_trajectory_df().
-
-    Returns
-    -------
-    pandas.DataFrame
-        Consecutive annotation pairs with start and end timestamps and positions.
-    """
+    """Link consecutive annotations of the same object."""
 
     required_columns = {
         "annotation_token",
@@ -208,20 +161,9 @@ def build_annotation_pairs(trajectory_df):
 
     return pd.DataFrame(records)
 
+
 def add_time_differences(annotation_pairs):
-    """
-    Calculate time differences for consecutive annotation pairs.
-
-    Parameters
-    ----------
-    annotation_pairs : pandas.DataFrame
-        Consecutive annotation pairs produced by build_annotation_pairs().
-
-    Returns
-    -------
-    pandas.DataFrame
-        Annotation pairs with raw timestamp differences and time differences in seconds.
-    """
+    """Calculate time intervals between annotation pairs in seconds."""
 
     required_columns = {
         "start_timestamp_us",
@@ -252,20 +194,9 @@ def add_time_differences(annotation_pairs):
 
     return result
 
+
 def add_position_changes(annotation_pairs):
-    """
-    Calculate position changes for consecutive annotation pairs.
-
-    Parameters
-    ----------
-    annotation_pairs : pandas.DataFrame
-        Consecutive annotation pairs containing start and end positions.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Annotation pairs with coordinate changes and 2D and 3D displacement.
-    """
+    """Calculate coordinate changes and 2D/3D displacement."""
 
     required_columns = {
         "start_x",
@@ -305,20 +236,9 @@ def add_position_changes(annotation_pairs):
 
     return result
 
+
 def add_reference_velocity(annotation_pairs):
-    """
-    Calculate annotation-derived velocity components and 2D and 3D reference speeds.
-
-    Parameters
-    ----------
-    annotation_pairs : pandas.DataFrame
-        Consecutive annotation pairs containing position changes and time differences.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Annotation pairs with velocity components and 2D and 3D reference speeds in m/s.
-    """
+    """Calculate velocity components and 2D/3D reference speeds."""
 
     required_columns = {
         "dt_s",
@@ -364,7 +284,7 @@ def add_reference_velocity(annotation_pairs):
 
 
 def build_vehicle_reference_df(samples, annotations, instances, categories):
-    """Build the complete vehicle reference-velocity table."""
+    """Build reference velocity data for vehicle annotations."""
 
     df = build_annotation_trajectory_df(
         samples,
