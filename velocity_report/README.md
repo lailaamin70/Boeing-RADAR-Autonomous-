@@ -122,6 +122,8 @@ The dataset directory should contain the corresponding metadata folder and the e
 
 The dataset location and version can be configured using environment variables.
 
+The mini dataset contains 10 scenes. The trainval metadata contains 598 scenes, but the condition analysis uses only sensor data packages 01, 03 and 05, rather than the complete trainval dataset.
+
 **Windows – PowerShell**
 
 ```powershell
@@ -255,6 +257,21 @@ These tables serve two purposes:
 - Allowing the Full Workflow to reuse saved data without repeating computationally expensive processing.
 
 The saved DataFrames are processed analysis data, not the original TruckScenes dataset.
+
+#### Git LFS
+
+The CSV files in `df/condition/` are tracked using Git LFS.
+
+After installing Git LFS, run the following commands from the repository root to download the actual CSV files:
+
+```bash
+git lfs install
+git lfs pull
+```
+
+A file beginning with `version https://git-lfs.github.com/spec/v1` is an LFS pointer rather than the actual CSV data. Download the LFS content before running the cached analysis.
+
+Cached mode (`USE_CACHED_DATA = True`) still requires the configured `v1.2-trainval` metadata under `TRUCKSCENES_DATA_ROOT`. Sections that read raw sensor files also require the corresponding sensor data. Cached DataFrames must match the report's dataset version and subset.
 
 ## 5. Notes and Limitations
 
