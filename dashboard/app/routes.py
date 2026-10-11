@@ -4,7 +4,7 @@ import os
 from flask import Blueprint, abort, current_app, jsonify, render_template, request, send_file
 from werkzeug.security import safe_join
 
-from app import analytics, scene_viewer, truckscenes_loader as tsl
+from app import analytics, dataset_stats, scene_viewer, truckscenes_loader as tsl
 
 bp = Blueprint("dashboard", __name__)
 
@@ -238,6 +238,56 @@ def camera_overlay(sample_token, channel):
     except KeyError:
         abort(404)
     return jsonify(data)
+
+
+def _int_arg(name, default, lo=0, hi=10**6):
+    try:
+        return max(lo, min(hi, int(request.args.get(name, default))))
+    except (TypeError, ValueError):
+        return default
+
+
+@bp.route("/overview")
+def overview_page():
+    """Dataset overview: counts, class/distance/visibility distributions, data volume."""
+    return render_template("overview.html")
+
+
+@bp.route("/api/overview")
+def api_overview():
+    return jsonify(dataset_stats.overview())
+
+
+@bp.route("/api/data_volume")
+def api_data_volume():
+    return jsonify(dataset_stats.data_volume(force=request.args.get("refresh") == "1"))
+
+
+@bp.route("/detectability")
+def detectability_page():
+    """How many lidar/radar points land on annotated objects, by range, and which sensors see what."""
+    return render_template("detectability.html", **dataset_stats.filter_options())
+
+
+@bp.route("/api/detectability")
+def api_detectability():
+    data = dataset_stats.detectability(
+        categories=request.args.getlist("category"),
+        tags=request.args.getlist("tag"),
+        min_lidar=_int_arg("min_lidar", 5, lo=1),
+        min_radar=_int_arg("min_radar", 1, lo=1),
+        include_camera=request.args.get("camera") == "1",
+        min_visibility=_int_arg("min_visibility", 2, lo=1),
+    )
+    return jsonify(data)
+
+
+@bp.route("/api/scene/<scene_token>/ego_motion")
+def api_scene_ego_motion(scene_token):
+    try:
+        return jsonify(dataset_stats.ego_motion(scene_token))
+    except KeyError:
+        abort(404)
 
 
 @bp.errorhandler(404)

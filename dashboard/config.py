@@ -31,6 +31,13 @@ class Config:
         os.path.join(BASE_DIR, "instance", "analysis_expensive_cache.json"),
     )
 
+    # File-size scan for the Overview page's data-volume table (stats every
+    # sample_data file once, so it's cached on disk; delete to rescan).
+    DATA_VOLUME_CACHE_PATH = os.environ.get(
+        "DATA_VOLUME_CACHE_PATH",
+        os.path.join(BASE_DIR, "instance", "data_volume_cache.json"),
+    )
+
     # Ego truck outline (scene viewer):
     EGO_TRUCK_BOXES = [
         {"name": "tractor", "center": [1.9, 0.0, 1.9], "size": [2.55, 6.5, 3.8]},

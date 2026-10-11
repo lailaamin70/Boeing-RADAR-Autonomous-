@@ -34,4 +34,21 @@
          class="sample-dot mono" title="{{ sample.timestamp }}">{{ loop.index }}</a>
     {% endfor %}
   </div>
+
+  <h2 class="h6 text-dim mt-5 mb-1">Ego motion</h2>
+  <div id="ego-status" class="text-dim mb-3" style="font-size:.85rem">Loading...</div>
+  <div id="ego-charts" class="row g-3" style="display:none">
+    <div class="col-12 col-xl-6"><div class="panel"><div class="mb-2">Speed (km/h)</div><canvas id="c-speed" height="100"></canvas></div></div>
+    <div class="col-12 col-xl-6"><div class="panel"><div class="mb-2">Longitudinal acceleration (m/s&sup2;)</div><canvas id="c-accel" height="100"></canvas></div></div>
+    <div class="col-12 col-xl-6"><div class="panel"><div class="mb-2">Yaw rate (deg/s)</div><canvas id="c-yaw" height="100"></canvas></div></div>
+    <div class="col-12 col-xl-6"><div class="panel"><div class="mb-2">Cabin minus chassis tilt (deg)</div><canvas id="c-tilt" height="100"></canvas></div></div>
+    <div class="col-12 col-xl-6"><div class="panel"><div class="mb-2">Path (m, relative to start)</div><canvas id="c-path"></canvas></div></div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>window.EGO_API = "{{ url_for('dashboard.api_scene_ego_motion', scene_token=scene.token) }}";</script>
+<script src="{{ url_for('static', filename='js/chart_common.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ego_motion.js') }}"></script>
 {% endblock %}
