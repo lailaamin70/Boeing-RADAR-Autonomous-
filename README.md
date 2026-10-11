@@ -24,6 +24,7 @@ The project includes sensor and point-cloud analysis, velocity estimation, pretr
 | [radar_lidar_pts.ipynb](radar_lidar_pts.ipynb) | Point-cloud and sensor-condition analysis. |
 | [recommendation_and_conclusion.ipynb](recommendation_and_conclusion.ipynb) | Overall recommendations and conclusions. |
 | [setup.sh](setup.sh) | Dashboard setup and launch script. |
+| [requirements.txt](requirements.txt) | Python dependencies for the dashboard. |
 
 ## Modules and Usage
 
@@ -31,7 +32,9 @@ The project includes sensor and point-cloud analysis, velocity estimation, pretr
 
 The dashboard provides an interactive interface for exploring TruckScenes data and the project's sensor comparisons.
 
-See the [Dashboard README](dashboard/README.md) for setup and launch instructions.
+See the [Dashboard README](dashboard/README.md) for installation, dataset configuration, launch instructions, usage, and troubleshooting.
+
+The dashboard dependencies are listed in the root [requirements.txt](requirements.txt). The [setup script](setup.sh) provides automatic setup and launch in a Linux/macOS Bash environment.
 
 The dashboard requires local TruckScenes data. With the default configuration, the mini dataset should be arranged as follows:
 
@@ -67,6 +70,7 @@ The velocity module uses `TRUCKSCENES_DATA_ROOT` for its dataset path. This diff
 ### Object Detection
 
 This module evaluates pretrained OmniHD PointPillars models on TruckScenes and compares LiDAR and 4D RADAR detection results.
+See the [Object Detection README](object_detection/README.md) for the module structure, saved results, external requirements, analysis workflow, and inference and evaluation command templates.
 
 Module contents:
 
