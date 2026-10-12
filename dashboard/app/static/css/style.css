@@ -199,3 +199,46 @@ a:hover { color: var(--accent); }
   border-color: #c9642c;
   color: #14161c;
 }
+
+/* --- Keep long text inside its box --- */
+.main,
+.row > * {
+  min-width: 0;          /* let flex/grid children shrink instead of growing to fit long text */
+}
+
+.scene-card,
+.scene-name,
+.scene-meta,
+.tag,
+.panel,
+.channel-head,
+.form-check-label,
+.token,
+h1,
+h2 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.tag {
+  max-width: 100%;
+}
+
+/* in tables, only break a word as a last resort so columns don't squash to a sliver */
+td,
+th {
+  overflow-wrap: break-word;
+}
+td .tag,
+th .tag {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+/* a table wider than the page scrolls sideways inside its own box */
+#scenes-table,
+#volume-table,
+#detail-table,
+#table-wrap {
+  overflow-x: auto;
+}

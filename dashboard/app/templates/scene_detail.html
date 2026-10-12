@@ -7,7 +7,7 @@
   </div>
 
   <h1 class="h4 mb-1">{{ scene.name }}</h1>
-  <div class="text-dim mono mb-3">{{ scene.token }}</div>
+  <div class="text-dim mono token mb-3">{{ scene.token }}</div>
 
   <div class="mb-4 d-flex justify-content-between align-items-start">
     <div>
@@ -23,7 +23,7 @@
   <div class="panel mb-4">
     <div class="row">
       <div class="col-sm-4"><span class="text-dim">Samples</span><br>{{ scene.nbr_samples }}</div>
-      <div class="col-sm-8"><span class="text-dim">Description</span><br>{{ scene.description }}</div>
+      <div class="col-sm-8"><span class="text-dim">Description</span><br>{{ scene.description | replace(';', '; ') }}</div>
     </div>
   </div>
 
