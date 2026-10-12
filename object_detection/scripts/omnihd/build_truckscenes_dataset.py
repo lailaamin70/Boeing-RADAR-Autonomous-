@@ -7,18 +7,18 @@ import sys
 from typing import Optional, Sequence, Tuple
 
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from src.object_detection.omnihd_adapter.build_dataset import (  # noqa: E402
+from object_detection.src.omnihd_adapter.build_dataset import (  # noqa: E402
     BuildConfig,
     build_dataset,
 )
-from src.object_detection.omnihd_adapter.lidar_adapter import (  # noqa: E402
+from object_detection.src.omnihd_adapter.lidar_adapter import (  # noqa: E402
     TRUCKSCENES_LIDAR_CHANNELS,
 )
-from src.object_detection.omnihd_adapter.radar_adapter import (  # noqa: E402
+from object_detection.src.omnihd_adapter.radar_adapter import (  # noqa: E402
     TRUCKSCENES_RADAR_CHANNELS,
 )
 
