@@ -74,6 +74,7 @@ def _make_driver():
     if os.environ.get("CHROME_BIN"):
         opts.binary_location = os.environ["CHROME_BIN"]
     for arg in ("--window-size=1500,1100", "--no-sandbox", "--disable-dev-shm-usage",
+                "--force-prefers-reduced-motion",   # Bootstrap then skips smooth scrolling
                 # software WebGL so the 3D view works on machines without a GPU
                 "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"):
         opts.add_argument(arg)
@@ -169,17 +170,22 @@ class BrowserTest(unittest.TestCase):
         if not self.js(WEBGL_JS):
             self.skipTest("this browser has no WebGL, which the 3D view needs")
 
+    def _click(self, element):
+        # Jump instantly to the element (centred) before clicking. 'instant' overrides CSS smooth scrolling
+        self.js("arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});", element)
+        element.click()
+
     def click(self, css):
-        self.driver.find_element(By.CSS_SELECTOR, css).click()
+        self._click(self.driver.find_element(By.CSS_SELECTOR, css))
+
+    def click_link(self, text):
+        self._click(self.driver.find_element(By.LINK_TEXT, text))
 
     def text(self, css):
         return self.driver.find_element(By.CSS_SELECTOR, css).text
 
     def displayed(self, element_id):
         return self.driver.find_element(By.ID, element_id).is_displayed()
-
-    def click_link(self, text):
-        self.driver.find_element(By.LINK_TEXT, text).click()
 
     def wait_url(self, fragment):
         self.wait(lambda d: fragment in d.current_url, f"URL containing {fragment!r}")
