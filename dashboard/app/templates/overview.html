@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Overview — TruckScenes Explorer{% endblock %}
+
+{% block content %}
+  <h1 class="h4 mb-1">Dataset overview</h1>
+  <div class="text-dim mb-4">Counts and distributions from the annotation tables. Annotations of the ego rig itself are excluded.</div>
+
+  <div id="status" class="text-dim mb-3">Loading...</div>
+  <div id="tiles" class="row g-3 mb-4"></div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-lg-6"><div class="panel"><div class="mb-2">Annotations per category</div><canvas id="c-categories"></canvas></div></div>
+    <div class="col-12 col-lg-6">
+      <div class="panel mb-3"><div class="mb-2">Annotations by distance from the truck (m)</div><canvas id="c-distance" height="110"></canvas></div>
+      <div class="panel"><div class="mb-2">Annotation visibility</div><canvas id="c-visibility" height="110"></canvas></div>
+    </div>
+  </div>
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-lg-6"><div class="panel"><div class="mb-2">Attributes</div><canvas id="c-attributes"></canvas></div></div>
+    <div class="col-12 col-lg-6"><div class="panel"><div class="mb-2">Scenes per condition tag</div><canvas id="c-tags"></canvas></div></div>
+  </div>
+
+  <h2 class="h6 text-dim mb-2">Scenes</h2>
+  <div id="scenes-table" class="mb-5"></div>
+
+  <h2 class="h5 mb-1">Data volume per sensor</h2>
+  <div class="text-dim mb-3">File sizes on disk, over every sweep as well as keyframes.</div>
+  <div id="volume-status" class="text-dim mb-3">Scanning file sizes (first run only)...</div>
+  <div class="row g-3">
+    <div class="col-12 col-lg-5"><div class="panel"><div class="mb-2">Data rate (MB/s)</div><canvas id="c-volume"></canvas></div></div>
+    <div class="col-12 col-lg-7"><div id="volume-table"></div><div id="volume-modalities" class="mt-2"></div></div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  window.OVERVIEW_API = "{{ url_for('dashboard.api_overview') }}";
+  window.VOLUME_API = "{{ url_for('dashboard.api_data_volume') }}";
+  window.SCENE_URL = "{{ url_for('dashboard.scene_detail', scene_token='__TOKEN__') }}";
+</script>
+<script src="{{ url_for('static', filename='js/chart_common.js') }}"></script>
+<script src="{{ url_for('static', filename='js/overview.js') }}"></script>
+{% endblock %}

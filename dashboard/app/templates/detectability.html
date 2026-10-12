@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Detectability — TruckScenes Explorer{% endblock %}
+
+{% block content %}
+  <h1 class="h4 mb-1">Detectability</h1>
+  <div class="text-dim mb-4">
+    How many lidar and radar points land on annotated objects, by distance, and which sensors can see each object.
+    Uses the point counts stored in the annotation table.
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-3">
+      <div class="panel mb-3">
+        <div class="text-dim mb-2" style="font-size:.78rem">"Seen" threshold (min points on the object)</div>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <label for="min-lidar" class="badge-lidar flex-grow-1">Lidar &ge;</label>
+          <input type="number" id="min-lidar" class="form-control form-control-sm" style="width:5rem" min="1" value="5">
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <label for="min-radar" class="badge-radar flex-grow-1">Radar &ge;</label>
+          <input type="number" id="min-radar" class="form-control form-control-sm" style="width:5rem" min="1" value="1">
+        </div>
+        <div class="text-dim mt-2" style="font-size:.72rem">
+          Radar counts are summed over all radars with no invalid-point filtering, so they are an upper bound.
+        </div>
+      </div>
+
+      <div class="panel mb-3">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="include-camera">
+          <label class="form-check-label" for="include-camera">Include camera in overlap chart</label>
+        </div>
+        <label for="min-vis" class="text-dim" style="font-size:.78rem">Camera "sees" it if visibility is at least</label>
+        <select id="min-vis" class="form-select form-select-sm" disabled>
+          {% for v in visibility_levels %}
+            <option value="{{ v.rank }}" {{ 'selected' if v.rank == 2 else '' }}>{{ v.description or v.level }}</option>
+          {% endfor %}
+        </select>
+        <div class="text-dim mt-2" style="font-size:.72rem">
+          A proxy: how much of the box is visible in the images. Objects with no visibility annotation are left out of the chart.
+        </div>
+      </div>
+
+      <div class="panel mb-3">
+        <div class="text-dim mb-2" style="font-size:.78rem">Object category</div>
+        <div style="max-height:220px; overflow-y:auto">
+          {% for c in categories %}
+            <div class="form-check">
+              <input class="form-check-input cat-check" type="checkbox" value="{{ c.name }}" id="cat-{{ loop.index }}">
+              <label class="form-check-label" for="cat-{{ loop.index }}" style="font-size:.85rem">{{ c.name }} <span class="text-dim mono">{{ c.count }}</span></label>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="text-dim mt-1" style="font-size:.72rem">None selected = all categories</div>
+      </div>
+
+      <div class="panel mb-3">
+        <div class="text-dim mb-2" style="font-size:.78rem">Scene conditions</div>
+        {% if tags %}
+          <div style="max-height:180px; overflow-y:auto">
+            {% for tag in tags %}
+              <div class="form-check">
+                <input class="form-check-input tag-check" type="checkbox" value="{{ tag }}" id="tag-{{ loop.index }}">
+                <label class="form-check-label" for="tag-{{ loop.index }}" style="font-size:.85rem">{{ tag }}</label>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="text-dim mt-1" style="font-size:.72rem">None selected = all scenes</div>
+        {% else %}
+          <div class="text-dim" style="font-size:.85rem">No scene tags found.</div>
+        {% endif %}
+      </div>
+
+      <button id="apply-btn" class="btn btn-accent btn-sm w-100">Apply</button>
+    </div>
+
+    <div class="col-12 col-lg-9">
+      <div id="status" class="text-dim mb-3">Loading...</div>
+      <div id="summary" class="mb-3"></div>
+
+      <div class="panel mb-3"><div class="mb-2">Mean points per object</div><canvas id="c-mean" height="90"></canvas></div>
+      <div class="panel mb-3"><div class="mb-2">Objects with at least the threshold number of points (%)</div><canvas id="c-seen" height="90"></canvas></div>
+
+      <div class="panel mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span>Which sensors see each object</span>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="combo-percent" checked>
+            <label class="form-check-label" for="combo-percent" style="font-size:.8rem">percent</label>
+          </div>
+        </div>
+        <canvas id="c-combos" height="110"></canvas>
+        <div id="combo-note" class="text-dim mt-2" style="font-size:.75rem"></div>
+      </div>
+
+      <div id="detail-table"></div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>window.DETECTABILITY_API = "{{ url_for('dashboard.api_detectability') }}";</script>
+<script src="{{ url_for('static', filename='js/chart_common.js') }}"></script>
+<script src="{{ url_for('static', filename='js/detectability.js') }}"></script>
+{% endblock %}

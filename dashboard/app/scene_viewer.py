@@ -9,11 +9,19 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import to_rgba
+from matplotlib.patches import Polygon
+
 from app import detections_loader, geometry, truckscenes_loader as tsl
+from config import Config
 
 MODALITY_COLOR = {"radar": "#e2793d", "lidar": "#4bb4c4"}
 ANNOTATION_COLOR = "#f2e5c9"
 DETECTION_COLOR = {"radar": "#ff4d8d", "lidar": "#c6ff4d"}
+EGO_COLOR = "#8b93a3"
+# matplotlib marker + colour per sensor modality for the ego-truck sensor mounts
+SENSOR_MARKER = {"radar": ("^", "#e2793d"), "lidar": ("D", "#4bb4c4"), "camera": ("s", "#7f9fd9")}
+
 MAX_3D_POINTS_PER_MODALITY = 20000
 
 
@@ -90,8 +98,63 @@ def _collect_annotation_boxes(sample_token, channels):
     return boxes
 
 
+def get_ego_vehicle(sample_token):
+    """
+    Static truck representation for the scene viewer, in the ego frame.
+    """
+    trucksc = tsl.get_trucksc()
+
+    boxes = []
+    for spec in Config.EGO_TRUCK_BOXES:
+        corners = geometry.box_corners(spec["center"], spec["size"], [1, 0, 0, 0])
+        boxes.append({"name": spec["name"], "corners": corners})
+
+    sensors = []
+    for channel, entry in tsl.get_sample_data_by_channel(sample_token).items():
+        calib = trucksc.get("calibrated_sensor", entry["sample_data"]["calibrated_sensor_token"])
+        sensors.append(
+            {
+                "channel": channel,
+                "modality": entry["modality"],
+                "xyz": [float(v) for v in calib["translation"]],
+            }
+        )
+    return {"boxes": boxes, "sensors": sensors}
+
+
+def _draw_ego_topdown(ax, sample_token):
+    ego = get_ego_vehicle(sample_token)
+
+    for i, box in enumerate(ego["boxes"]):
+        footprint = box["corners"][[0, 1, 5, 4], :2]
+        ax.add_patch(
+            Polygon(
+                footprint,
+                closed=True,
+                facecolor=to_rgba(EGO_COLOR, 0.25),
+                edgecolor=EGO_COLOR,
+                linewidth=1.2,
+                zorder=0.5,
+                label="ego truck" if i == 0 else None,
+            )
+        )
+        ax.plot(footprint[[0, 1], 0], footprint[[0, 1], 1], c="#2b3140", linewidth=3, zorder=3)
+
+    by_modality = {}
+    for sensor in ego["sensors"]:
+        by_modality.setdefault(sensor["modality"], []).append(sensor["xyz"])
+    for modality, xyzs in by_modality.items():
+        marker, color = SENSOR_MARKER.get(modality, ("o", "#ffffff"))
+        arr = np.array(xyzs)
+        ax.scatter(
+            arr[:, 0], arr[:, 1], marker=marker, s=26, c=color,
+            edgecolors="white", linewidths=0.6, zorder=6, label=f"{modality} sensors",
+        )
+
+
 def render_topdown_png(
-    sample_token, sensors, show_annotations, show_detections=False, min_score=None, xlim=80, ylim=80
+    sample_token, sensors, show_annotations, show_detections=False, min_score=None,
+    show_ego=False, xlim=80, ylim=80,
 ):
     channels = tsl.get_sample_data_by_channel(sample_token)
     points = _collect_points(sample_token, sensors)
@@ -104,6 +167,9 @@ def render_topdown_png(
     if "radar" in points:
         xyz = points["radar"]["xyz"]
         ax.scatter(xyz[:, 0], xyz[:, 1], s=5, c=MODALITY_COLOR["radar"], alpha=0.85, label="radar")
+
+    if show_ego:
+        _draw_ego_topdown(ax, sample_token)
 
     if show_annotations:
         for box in _collect_annotation_boxes(sample_token, channels):
@@ -154,7 +220,9 @@ def _downsample(xyz, color, cap):
     return xyz[idx], color[idx]
 
 
-def get_points_payload(sample_token, sensors, show_annotations, show_detections=False, min_score=None):
+def get_points_payload(
+    sample_token, sensors, show_annotations, show_detections=False, min_score=None, show_ego=False
+):
     channels = tsl.get_sample_data_by_channel(sample_token)
     points = _collect_points(sample_token, sensors)
 
@@ -188,6 +256,15 @@ def get_points_payload(sample_token, sensors, show_annotations, show_detections=
         ]
     else:
         payload["detections"] = []
+
+    if show_ego:
+        ego = get_ego_vehicle(sample_token)
+        payload["ego"] = {
+            "boxes": [{"name": b["name"], "corners": b["corners"].tolist()} for b in ego["boxes"]],
+            "sensors": ego["sensors"],
+        }
+    else:
+        payload["ego"] = None
 
     return payload
 

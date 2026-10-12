@@ -1,0 +1,4 @@
+-r requirements.txt
+# Optional requirments for unit / selenium tests
+selenium>=4.6
+pytest

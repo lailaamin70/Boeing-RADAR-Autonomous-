@@ -9,7 +9,7 @@
   </div>
 
   <h1 class="h4 mb-1">Scene viewer</h1>
-  <div class="text-dim mono mb-3">{{ scene.token }}</div>
+  <div class="text-dim mono token mb-3">{{ scene.token }}</div>
 
   <div class="row g-3">
     <div class="col-12 col-lg-3">
@@ -40,6 +40,13 @@
 
       <div class="panel mb-3">
         <div class="text-dim mb-2" style="font-size:.78rem">Overlays</div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="show-ego" checked>
+          <label class="form-check-label" for="show-ego">
+            Ego truck
+            <div class="text-dim" style="font-size:.7rem">Body outline + sensor mounts</div>
+          </label>
+        </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" id="show-annotations" checked>
           <label class="form-check-label" for="show-annotations">Annotations</label>
