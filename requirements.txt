@@ -5,5 +5,5 @@ Flask
 matplotlib==3.11.2
 numpy==2.4.6
 pyquaternion==0.9.9
-truckscenes-devkit==1.2.0
+truckscenes-devkit[all]==1.2.0
 Werkzeug
